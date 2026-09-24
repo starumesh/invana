@@ -19,10 +19,11 @@ export function DashboardDownloadPanel({ event }: Props) {
   const [busy, setBusy] = useState<"png" | "pdf" | null>(null);
   const [error, setError] = useState("");
 
-  const template = getTemplate(event.config.templateId);
-  if (!template) {
+  const resolved = getTemplate(event.config.templateId);
+  if (!resolved) {
     return <p className="text-sm text-red-700">Template missing for this event.</p>;
   }
+  const template = resolved;
 
   const filenameBase =
     displayTitle(event.config).toLowerCase().replace(/[^a-z0-9]+/g, "-") || "invana";
@@ -61,7 +62,7 @@ export function DashboardDownloadPanel({ event }: Props) {
     setError("");
     try {
       const svg = await getSvg();
-      const blob = await exportPdf(svg, template!);
+      const blob = await exportPdf(svg, template);
       downloadBlob(blob, `${filenameBase}.pdf`);
       trackDownload({
         templateId: template.id,
