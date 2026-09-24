@@ -4,6 +4,7 @@ import { TemplateThumb } from "@/components/templates/TemplateThumb";
 import { Select } from "@/components/ui/Field";
 import { EVENT_TYPES } from "@/config/event-types";
 import { CARD_TYPES } from "@/config/card-types";
+import { trackTemplateClick } from "@/lib/analytics";
 import { TEMPLATES } from "@/templates/registry";
 import type { CardTypeId, EventTypeId } from "@/types";
 
@@ -106,6 +107,16 @@ export function TemplatesPage() {
               to={href}
               className="group block animate-fade-up"
               style={{ animationDelay: `${Math.min(index, 9) * 35}ms` }}
+              onClick={() =>
+                trackTemplateClick({
+                  templateId: template.id,
+                  templateName: template.name,
+                  kind: template.kind,
+                  source: "gallery",
+                  eventType: template.kind === "invitation" ? template.eventTypes[0] : undefined,
+                  cardType: template.kind === "card" ? template.cardTypes?.[0] : undefined,
+                })
+              }
             >
               <TemplateThumb
                 template={template}

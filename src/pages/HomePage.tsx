@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { TemplateThumb } from "@/components/templates/TemplateThumb";
 import { getEventType } from "@/config/event-types";
+import { trackTemplateClick } from "@/lib/analytics";
 import { getTemplate, templatesForCard, templatesForEvent } from "@/templates/registry";
 import type { CardTypeId, EventTypeId, TemplateDefinition } from "@/types";
 
@@ -255,6 +256,16 @@ export function HomePage() {
               to={sample.href}
               className="group block animate-fade-up"
               style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}
+              onClick={() =>
+                trackTemplateClick({
+                  templateId: sample.template.id,
+                  templateName: sample.template.name,
+                  kind: sample.template.kind,
+                  source: "home",
+                  eventType: sample.eventType,
+                  cardType: sample.cardType,
+                })
+              }
             >
               <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card transition duration-300 group-hover:-translate-y-1 group-hover:border-gold/35 group-hover:shadow-lift">
                 <TemplateThumb

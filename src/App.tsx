@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { Shell } from "@/components/layout/Shell";
+import { AnalyticsListener } from "@/components/seo/AnalyticsListener";
 import { Seo } from "@/components/seo/Seo";
 import { BuilderPage } from "@/pages/BuilderPage";
 import { CreatePage } from "@/pages/CreatePage";
@@ -14,6 +15,7 @@ export function App() {
   return (
     <>
       <ScrollToTop />
+      <AnalyticsListener />
       <Seo />
       <Routes>
         <Route path="/invite/:slug" element={<InvitePage />} />

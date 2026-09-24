@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useRequireSignIn } from "@/auth/useRequireSignIn";
 import { Button } from "@/components/ui/Button";
 import { DownloadIcon, PdfIcon, PreviewIcon } from "@/components/ui/Icons";
+import { trackDownload, trackPreview } from "@/lib/analytics";
 import { downloadBlob, exportImage, exportPdf } from "@/lib/export";
 import { Composition } from "@/lib/render/Composition";
 import type { RenderInput, TemplateDefinition } from "@/types";
@@ -37,6 +38,14 @@ export function PreviewPanel({
     onMaximizedChange?.(open);
     if (maximizedProp === undefined) setInternalOpen(open);
     if (!open) setZoom(1);
+    if (open) {
+      trackPreview({
+        templateId: template.id,
+        templateName: template.name,
+        kind: template.kind,
+        source: "builder",
+      });
+    }
   }
 
   useEffect(() => {
@@ -68,6 +77,13 @@ export function PreviewPanel({
     const svg = await getSvg();
     const blob = await exportImage(svg, "high", "image/png");
     downloadBlob(blob, `${filenameBase}.png`);
+    trackDownload({
+      templateId: template.id,
+      templateName: template.name,
+      kind: template.kind,
+      format: "png",
+      source: "builder",
+    });
   }
 
   async function onPdf() {
@@ -75,6 +91,13 @@ export function PreviewPanel({
     const svg = await getSvg();
     const blob = await exportPdf(svg, template);
     downloadBlob(blob, `${filenameBase}.pdf`);
+    trackDownload({
+      templateId: template.id,
+      templateName: template.name,
+      kind: template.kind,
+      format: "pdf",
+      source: "builder",
+    });
   }
 
   const modal =

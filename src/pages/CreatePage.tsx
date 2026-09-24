@@ -6,7 +6,8 @@ import { Select } from "@/components/ui/Field";
 import { CARD_TYPES, normalizeCardType } from "@/config/card-types";
 import { EVENT_TYPES, getEventType } from "@/config/event-types";
 import { createDraft } from "@/lib/drafts";
-import { templatesForCard, templatesForEvent } from "@/templates/registry";
+import { trackTemplateUse } from "@/lib/analytics";
+import { getTemplate, templatesForCard, templatesForEvent } from "@/templates/registry";
 import type { CardTypeId, EventTypeId } from "@/types";
 
 const VALID_EVENTS = new Set(EVENT_TYPES.map((t) => t.id));
@@ -55,6 +56,15 @@ function InvitationCreate({ eventType }: { eventType: EventTypeId }) {
   async function start(templateId: string) {
     setBusy(true);
     try {
+      const template = getTemplate(templateId);
+      if (template) {
+        trackTemplateUse({
+          templateId: template.id,
+          templateName: template.name,
+          kind: "invitation",
+          eventType,
+        });
+      }
       const draft = await createDraft({ templateId, eventType });
       navigate(`/builder/${draft.id}`);
     } finally {
@@ -131,6 +141,15 @@ function CardCreate() {
   async function start(templateId: string) {
     setBusy(true);
     try {
+      const template = getTemplate(templateId);
+      if (template) {
+        trackTemplateUse({
+          templateId: template.id,
+          templateName: template.name,
+          kind: "card",
+          cardType,
+        });
+      }
       const draft = await createDraft({ templateId, cardType });
       navigate(`/builder/${draft.id}`);
     } finally {

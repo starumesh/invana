@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_REQUIRE_SIGN_IN?: string;
   /** Optional override for Connected Mode hardcoded OTP (default 123456). Never show in UI. */
   readonly VITE_DEV_OTP?: string;
+  /** Google Analytics 4 measurement ID (G-XXXXXXXX). Leave unset to disable analytics. */
+  readonly VITE_GA_MEASUREMENT_ID?: string;
 }
 
 interface ImportMeta {

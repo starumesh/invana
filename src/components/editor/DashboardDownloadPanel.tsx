@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useRequireSignIn } from "@/auth/useRequireSignIn";
 import { Button } from "@/components/ui/Button";
 import { DownloadIcon, PdfIcon } from "@/components/ui/Icons";
+import { trackDownload } from "@/lib/analytics";
 import { displayTitle } from "@/lib/fields";
 import { downloadBlob, exportImage, exportPdf } from "@/lib/export";
 import { Composition } from "@/lib/render/Composition";
@@ -40,6 +41,13 @@ export function DashboardDownloadPanel({ event }: Props) {
       const svg = await getSvg();
       const blob = await exportImage(svg, "high", "image/png");
       downloadBlob(blob, `${filenameBase}.png`);
+      trackDownload({
+        templateId: template.id,
+        templateName: template.name,
+        kind: template.kind,
+        format: "png",
+        source: "dashboard",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed.");
     } finally {
@@ -55,6 +63,13 @@ export function DashboardDownloadPanel({ event }: Props) {
       const svg = await getSvg();
       const blob = await exportPdf(svg, template!);
       downloadBlob(blob, `${filenameBase}.pdf`);
+      trackDownload({
+        templateId: template.id,
+        templateName: template.name,
+        kind: template.kind,
+        format: "pdf",
+        source: "dashboard",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Download failed.");
     } finally {

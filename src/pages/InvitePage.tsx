@@ -15,6 +15,7 @@ import { createId } from "@/lib/id";
 import { Composition } from "@/lib/render/Composition";
 import { rsvpSchema } from "@/lib/validation";
 import { usePageMeta } from "@/seo/usePageMeta";
+import { trackPreview } from "@/lib/analytics";
 import { getTemplate } from "@/templates/registry";
 import { addPublicRsvp, resolveEventBySlug } from "@/services";
 import type { Rsvp, RsvpResponse, StoredEvent } from "@/types";
@@ -76,6 +77,16 @@ export function InvitePage() {
   }, [slug]);
 
   const template = event ? getTemplate(event.config.templateId) : undefined;
+
+  useEffect(() => {
+    if (!template || !event) return;
+    trackPreview({
+      templateId: template.id,
+      templateName: template.name,
+      kind: template.kind,
+      source: "invite",
+    });
+  }, [template, event]);
 
   function scrollToDetails() {
     detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
