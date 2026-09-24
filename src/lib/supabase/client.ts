@@ -23,7 +23,7 @@ export function getSupabase(): SupabaseClient | null {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      // Query-param tokens (?code=) work with HashRouter; hash tokens would collide with /#/routes.
+      // Query-param tokens (?code=) work with BrowserRouter path URLs.
       flowType: "pkce",
     },
   });

@@ -234,6 +234,35 @@ export function HomePage() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-6xl px-4 py-10 md:py-12">
+        <div className="grid gap-8 md:grid-cols-2 md:gap-12">
+          <div>
+            <h2 className="font-serif text-2xl md:text-[1.75rem]">Digital invitations online</h2>
+            <p className="mt-3 text-sm leading-relaxed text-ink-muted md:text-base">
+              Design a free online invitation for weddings, birthdays, engagements, and festive events. Choose a
+              template, personalize names and venue, then download your invitation card or publish an RSVP page to
+              share on WhatsApp.
+            </p>
+            <Link to="/create" className="mt-3 inline-block text-sm font-medium text-gold-dark underline-offset-4 hover:underline">
+              Create an invitation →
+            </Link>
+          </div>
+          <div>
+            <h2 className="font-serif text-2xl md:text-[1.75rem]">Marriage bio data &amp; biodata</h2>
+            <p className="mt-3 text-sm leading-relaxed text-ink-muted md:text-base">
+              Build a classic bio data / biodata sheet for matrimony — personal, family, and contact details in a
+              clean format. Download PNG or PDF when you are ready to share.
+            </p>
+            <Link
+              to="/create/card"
+              className="mt-3 inline-block text-sm font-medium text-gold-dark underline-offset-4 hover:underline"
+            >
+              Create bio data →
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto max-w-6xl px-4 py-12 md:py-14">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>

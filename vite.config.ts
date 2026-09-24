@@ -2,11 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
-// Relative base so the build works on GitHub Pages project pages (/<repo>/)
-// and custom domains alike without hardcoding a repo name. Routing uses
-// HashRouter, so deep links resolve without a server-side 404 fallback.
+// Absolute base for Vercel / custom domains (BrowserRouter + SPA rewrites).
 export default defineConfig({
-  base: "./",
+  base: "/",
   plugins: [react()],
   resolve: {
     alias: {

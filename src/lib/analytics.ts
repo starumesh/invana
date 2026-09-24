@@ -38,7 +38,7 @@ export function initAnalytics(): void {
   };
   window.gtag("js", new Date());
   window.gtag("config", measurementId, {
-    send_page_view: false, // HashRouter — we send page_view ourselves
+    send_page_view: false, // SPA — we send page_view on route change
   });
 
   const script = document.createElement("script");
@@ -56,7 +56,7 @@ export function trackEvent(name: string, params?: AnalyticsParams): void {
   });
 }
 
-/** SPA page view for HashRouter paths. */
+/** SPA page view for client-side routes. */
 export function trackPageView(path: string, title?: string): void {
   const measurementId = getGaMeasurementId();
   if (!measurementId || !window.gtag) return;

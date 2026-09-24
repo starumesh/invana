@@ -1,3 +1,4 @@
+import { JsonLd } from "@/components/seo/JsonLd";
 import { usePageMeta } from "@/seo/usePageMeta";
 import type { PageMeta } from "@/seo/pageMeta";
 
@@ -5,5 +6,5 @@ import type { PageMeta } from "@/seo/pageMeta";
 export function Seo(props: Partial<PageMeta> = {}) {
   const hasOverride = Object.keys(props).length > 0;
   usePageMeta(hasOverride ? props : null);
-  return null;
+  return <JsonLd />;
 }
