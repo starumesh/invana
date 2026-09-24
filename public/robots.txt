@@ -1,0 +1,8 @@
+# Allow crawlers. Prefer titles/meta for branded & share discovery.
+# Note: this app uses HashRouter (#/routes). Search engines often ignore
+# hash fragments, so a traditional XML sitemap of hash URLs has limited value
+# until path-based routing (BrowserRouter + host rewrites) is adopted.
+User-agent: *
+Allow: /
+
+# Sitemap: omit until clean path URLs exist; see README “SEO notes”.

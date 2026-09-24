@@ -1,0 +1,10 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA deep-link fallback for BrowserRouter / path routes.
+# HashRouter (#/invite/slug) works without this; keep it for dedicated-host path URLs.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

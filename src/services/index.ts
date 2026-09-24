@@ -1,0 +1,107 @@
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { demoAuth, demoMessaging, demoPersistence } from "@/services/demo";
+import { demoStorage } from "@/services/demoStorage";
+import { supabaseAuth } from "@/services/supabase/auth";
+import { cloudMessaging } from "@/services/supabase/messaging";
+import { supabasePersistence } from "@/services/supabase/persistence";
+import { supabaseStorage } from "@/services/supabase/storage";
+import type { AuthProvider, MessagingProvider, PersistenceProvider, StorageProvider } from "@/services/types";
+import type { Rsvp, StoredEvent } from "@/types";
+
+export { isSupabaseConfigured };
+
+export const isDemoMode = !isSupabaseConfigured();
+
+function messagingMode(): "demo" | "cloud" | "wa_me" {
+  const raw = (import.meta.env.VITE_MESSAGING_MODE ?? "").trim().toLowerCase();
+  if (raw === "cloud" || raw === "wa_me" || raw === "demo") return raw;
+  // Connected persistence does not imply Cloud API — default to wa.me until explicitly enabled.
+  return isDemoMode ? "demo" : "wa_me";
+}
+
+/**
+ * When true, Download / Publish / Share require sign-in in Connected Mode.
+ * Demo Mode never gates. Default: true (unset = require sign-in when Connected).
+ */
+export function isSignInRequired(): boolean {
+  if (isDemoMode) return false;
+  const raw = (import.meta.env.VITE_REQUIRE_SIGN_IN ?? "true").trim().toLowerCase();
+  return raw !== "false" && raw !== "0" && raw !== "no";
+}
+
+export const auth: AuthProvider = isDemoMode ? demoAuth : supabaseAuth;
+/** Default Connected adapter; prefer `activePersistence()` so guests can edit locally before sign-in. */
+export const persistence: PersistenceProvider = isDemoMode ? demoPersistence : supabasePersistence;
+export const storage: StorageProvider = isDemoMode ? demoStorage : supabaseStorage;
+
+export const messaging: MessagingProvider =
+  !isDemoMode && messagingMode() === "cloud" ? cloudMessaging : demoMessaging;
+
+/** True when Demo Mode, or Connected with a real Supabase session. */
+export function hasAuthSession(): boolean {
+  if (isDemoMode) return true;
+  const user = supabaseAuth.currentUser();
+  return Boolean(user?.id && user.id !== "unauthenticated");
+}
+
+/**
+ * Persistence for the current session: remote when signed in to Supabase,
+ * otherwise localStorage so templates / create / builder work without sign-in.
+ */
+export function activePersistence(): PersistenceProvider {
+  if (isDemoMode) return demoPersistence;
+  return hasAuthSession() ? supabasePersistence : demoPersistence;
+}
+
+/**
+ * Public invite lookup: prefer a published copy from either store.
+ * Important: do not return a local draft when Supabase has the published event
+ * (that previously caused "Invitation not found" after Publish).
+ */
+export async function resolveEventBySlug(slug: string): Promise<StoredEvent | null> {
+  const local = await demoPersistence.getBySlug(slug);
+  if (isDemoMode) return local;
+
+  let remote: StoredEvent | null = null;
+  try {
+    remote = await supabasePersistence.getBySlug(slug);
+  } catch {
+    remote = null;
+  }
+
+  if (remote?.status === "published") {
+    await demoPersistence.saveEvent(remote);
+    return remote;
+  }
+  if (local?.status === "published") return local;
+  return remote ?? local;
+}
+
+/** Guest RSVP: prefer cloud in Connected Mode so hosts see responses. */
+export async function addPublicRsvp(rsvp: Rsvp): Promise<Rsvp> {
+  if (isDemoMode) return demoPersistence.addRsvp(rsvp);
+  try {
+    const saved = await supabasePersistence.addRsvp(rsvp);
+    try {
+      await demoPersistence.addRsvp(saved);
+    } catch {
+      /* ignore local mirror failures */
+    }
+    return saved;
+  } catch {
+    return demoPersistence.addRsvp(rsvp);
+  }
+}
+
+export function modeLabel() {
+  if (isDemoMode) return "Demo Mode";
+  const msg = messagingMode();
+  if (msg === "cloud") return "Connected (WhatsApp Cloud)";
+  return "Connected";
+}
+
+export function messagingLabel() {
+  const mode = messagingMode();
+  if (mode === "cloud" && !isDemoMode) return "WhatsApp Cloud API";
+  return "WhatsApp wa.me";
+}
