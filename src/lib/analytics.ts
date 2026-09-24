@@ -7,7 +7,7 @@ export type AnalyticsParams = Record<string, string | number | boolean | undefin
 
 declare global {
   interface Window {
-    dataLayer: unknown[];
+    dataLayer: IArguments[];
     gtag?: (...args: unknown[]) => void;
   }
 }
@@ -16,7 +16,8 @@ let initialized = false;
 
 export function getGaMeasurementId(): string | undefined {
   const id = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim();
-  return id || undefined;
+  if (!id || id.includes("XXXX")) return undefined;
+  return id;
 }
 
 export function isAnalyticsEnabled(): boolean {
@@ -30,13 +31,14 @@ export function initAnalytics(): void {
   initialized = true;
 
   window.dataLayer = window.dataLayer || [];
-  window.gtag = function gtag(...args: unknown[]) {
-    window.dataLayer.push(args);
+  // GA requires the Arguments object, not a rest-parameter array.
+  window.gtag = function gtag() {
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer.push(arguments);
   };
   window.gtag("js", new Date());
   window.gtag("config", measurementId, {
     send_page_view: false, // HashRouter — we send page_view ourselves
-    anonymize_ip: true,
   });
 
   const script = document.createElement("script");
@@ -46,8 +48,12 @@ export function initAnalytics(): void {
 }
 
 export function trackEvent(name: string, params?: AnalyticsParams): void {
-  if (!isAnalyticsEnabled() || typeof window === "undefined" || !window.gtag) return;
-  window.gtag("event", name, params);
+  const measurementId = getGaMeasurementId();
+  if (!measurementId || typeof window === "undefined" || !window.gtag) return;
+  window.gtag("event", name, {
+    ...params,
+    send_to: measurementId,
+  });
 }
 
 /** SPA page view for HashRouter paths. */
@@ -58,6 +64,7 @@ export function trackPageView(path: string, title?: string): void {
     page_path: path,
     page_title: title ?? document.title,
     page_location: window.location.href,
+    send_to: measurementId,
   });
 }
 
