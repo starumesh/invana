@@ -10,6 +10,7 @@ import { DashboardDownloadPanel } from "@/components/editor/DashboardDownloadPan
 import { PublishPanel } from "@/components/editor/PublishPanel";
 import { SharePanel } from "@/components/editor/SharePanel";
 import { Button } from "@/components/ui/Button";
+import { DeleteIcon } from "@/components/ui/Icons";
 import { displayTitle } from "@/lib/fields";
 import { persistEvent } from "@/lib/drafts";
 import { inviteUrl } from "@/lib/url";
