@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { getSupabase } from "@/lib/supabase/client";
-import { claimLocalDrafts } from "@/lib/drafts";
+import { onAccountSignedIn, onAccountSignedOut } from "@/api/events";
 import { auth, isDemoMode, modeLabel } from "@/services";
 import { supabaseAuth } from "@/services/supabase/auth";
 import type { DemoUser } from "@/types";
@@ -19,12 +19,29 @@ type AuthSessionValue = {
   isDemoMode: boolean;
   modeLabel: string;
   signedIn: boolean;
-  signInWithEmailOtp: (email: string, otp: string) => Promise<{ error?: string }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
+  signUpWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
 const AuthSessionContext = createContext<AuthSessionValue | null>(null);
+
+function mapDemoUser(user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null): DemoUser | null {
+  if (!user) return null;
+  const metaName = user.user_metadata?.name;
+  const name =
+    (typeof metaName === "string" && metaName) || user.email?.split("@")[0] || "Host";
+  return {
+    id: user.id,
+    email: user.email ?? "",
+    name,
+  };
+}
+
+function kickOffClaim() {
+  onAccountSignedIn();
+}
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -50,19 +67,30 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     void (async () => {
-      await supabaseAuth.ready();
+      const next = await supabaseAuth.ready();
       if (cancelled) return;
-      setUser(auth.currentUser());
-      setReady(true);
+      setUser(next);
+      // Unblock the app immediately — do not await claim/sync.
+      if (!cancelled) setReady(true);
+
+      if (next?.id) {
+        kickOffClaim();
+      } else {
+        onAccountSignedOut();
+      }
 
       const sb = getSupabase();
       if (!sb) return;
       const {
         data: { subscription },
-      } = sb.auth.onAuthStateChange((event) => {
-        setUser(auth.currentUser());
+      } = sb.auth.onAuthStateChange((event, session) => {
+        // Prefer the session from the event — don't rely on a separate cache race.
+        setUser(session?.user ? mapDemoUser(session.user) : null);
         if (event === "SIGNED_IN") {
-          void claimLocalDrafts();
+          kickOffClaim();
+        }
+        if (event === "SIGNED_OUT") {
+          onAccountSignedOut();
         }
       });
       unsub = () => subscription.unsubscribe();
@@ -74,25 +102,38 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signInWithEmailOtp = useCallback(async (email: string, otp: string) => {
-    if (isDemoMode) return { error: "Demo Mode does not use email sign-in." };
-    const result = await supabaseAuth.signInWithEmailOtp(email, otp);
-    if (!result.error) {
-      setUser(auth.currentUser());
-      // Await claim so /builder/:id can load the draft after navigate.
-      try {
-        await claimLocalDrafts();
-      } catch {
-        // Builder still falls back to local claim on load.
-      }
-    }
-    return result;
+  const afterAuthSuccess = useCallback(async () => {
+    const next = await supabaseAuth.ready();
+    setUser(next);
+    // Claim in background so login navigation is not blocked on upserts.
+    kickOffClaim();
   }, []);
+
+  const signInWithPassword = useCallback(
+    async (email: string, password: string) => {
+      if (isDemoMode) return { error: "Demo Mode does not use email sign-in." };
+      const result = await supabaseAuth.signInWithPassword(email, password);
+      if (!result.error) await afterAuthSuccess();
+      return result;
+    },
+    [afterAuthSuccess],
+  );
+
+  const signUpWithPassword = useCallback(
+    async (email: string, password: string) => {
+      if (isDemoMode) return { error: "Demo Mode does not use email sign-in." };
+      const result = await supabaseAuth.signUpWithPassword(email, password);
+      if (!result.error) await afterAuthSuccess();
+      return result;
+    },
+    [afterAuthSuccess],
+  );
 
   const signOut = useCallback(async () => {
     if (isDemoMode) return;
     await supabaseAuth.signOut();
     setUser(null);
+    onAccountSignedOut();
   }, []);
 
   const value = useMemo<AuthSessionValue>(
@@ -102,11 +143,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       isDemoMode,
       modeLabel: modeLabel(),
       signedIn: isDemoMode ? Boolean(user) : Boolean(user?.id && user.id !== "unauthenticated"),
-      signInWithEmailOtp,
+      signInWithPassword,
+      signUpWithPassword,
       signOut,
       refresh,
     }),
-    [ready, user, signInWithEmailOtp, signOut, refresh],
+    [ready, user, signInWithPassword, signUpWithPassword, signOut, refresh],
   );
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;

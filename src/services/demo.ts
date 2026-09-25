@@ -57,24 +57,7 @@ export const demoPersistence: PersistenceProvider = {
     return matches.find((event) => event.status === "published") ?? matches[0] ?? null;
   },
   async saveEvent(event) {
-    const all = read<StoredEvent[]>(EVENT_KEY, []);
-    const publishedKey = event.status === "published" ? slugKey(event.slug) : "";
-
-    const next = all.map((item) => {
-      if (item.id === event.id) return event;
-      // When publishing, free the slug on any other event that collided (common with default titles).
-      if (publishedKey && slugKey(item.slug) === publishedKey) {
-        const suffix = item.id.replace(/^evt_/, "").slice(-6) || createId("s").slice(-6);
-        return { ...item, slug: `${slugKey(item.slug) || "invite"}-${suffix}` };
-      }
-      return item;
-    });
-
-    const index = next.findIndex((item) => item.id === event.id);
-    if (index >= 0) next[index] = event;
-    else next.unshift(event);
-
-    write(EVENT_KEY, next);
+    mergeLocalEvents([event]);
     return event;
   },
   async deleteEvent(id) {
@@ -85,6 +68,11 @@ export const demoPersistence: PersistenceProvider = {
   },
   async listRsvps(eventId) {
     return read<Rsvp[]>(RSVP_KEY, []).filter((item) => item.eventId === eventId);
+  },
+  async listRsvpsForEventIds(eventIds) {
+    if (!eventIds.length) return [];
+    const want = new Set(eventIds);
+    return read<Rsvp[]>(RSVP_KEY, []).filter((item) => want.has(item.eventId));
   },
   async addRsvp(rsvp) {
     const all = read<Rsvp[]>(RSVP_KEY, []);
@@ -133,6 +121,37 @@ export function createDraftId() {
 /** All events in localStorage (Connected guests + Demo Mode). */
 export function readLocalEvents(): StoredEvent[] {
   return read<StoredEvent[]>(EVENT_KEY, []);
+}
+
+/** All RSVPs in localStorage (one read — use for batch dashboard loads). */
+export function readLocalRsvps(): Rsvp[] {
+  return read<Rsvp[]>(RSVP_KEY, []);
+}
+
+/**
+ * Merge events into localStorage in a single read/write.
+ * Used to mirror a remote list without N sequential saveEvent awaits.
+ */
+export function mergeLocalEvents(events: StoredEvent[]): void {
+  if (!events.length) return;
+  let all = read<StoredEvent[]>(EVENT_KEY, []);
+
+  for (const event of events) {
+    const publishedKey = event.status === "published" ? slugKey(event.slug) : "";
+    all = all.map((item) => {
+      if (item.id === event.id) return event;
+      if (publishedKey && slugKey(item.slug) === publishedKey) {
+        const suffix = item.id.replace(/^evt_/, "").slice(-6) || createId("s").slice(-6);
+        return { ...item, slug: `${slugKey(item.slug) || "invite"}-${suffix}` };
+      }
+      return item;
+    });
+    const index = all.findIndex((item) => item.id === event.id);
+    if (index >= 0) all[index] = event;
+    else all.unshift(event);
+  }
+
+  write(EVENT_KEY, all);
 }
 
 export function isGuestLocalOwner(userId: string): boolean {

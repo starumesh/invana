@@ -10,7 +10,9 @@ type Props = {
 function targetMs(date: DateValue, time?: TimeValue | null): number {
   const hours = time?.hour ?? 0;
   const minutes = time?.minute ?? 0;
-  return new Date(date.year, date.month - 1, date.day, hours, minutes, 0, 0).getTime();
+  const month = date.month ?? 1;
+  const day = date.day ?? 1;
+  return new Date(date.year, month - 1, day, hours, minutes, 0, 0).getTime();
 }
 
 function partsFrom(ms: number) {

@@ -1,16 +1,22 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthSession } from "@/auth/AuthSession";
-import { isSignInRequired } from "@/services";
+import { isDemoMode, isSignInRequired } from "@/services";
 
 type GateOptions = {
+  /**
+   * `download` — respects `VITE_REQUIRE_SIGN_IN` (default true).
+   * `account` — always requires sign-in in Connected Mode (Publish / Share).
+   */
+  mode?: "download" | "account";
   /** Flush draft / pending work before leaving for /signin (Connected guests). */
   beforeRedirect?: () => void | Promise<void>;
 };
 
 /**
- * Gates Download / Publish / Share when Connected Mode requires sign-in.
- * Respects `VITE_REQUIRE_SIGN_IN` (default true). Demo Mode never gates.
- * Preserves return path via location state `from`.
+ * Gates sensitive actions in Connected Mode.
+ * - Download: config via `VITE_REQUIRE_SIGN_IN`
+ * - Publish / Share: always require an account
+ * Demo Mode never gates.
  */
 export function useRequireSignIn() {
   const { signedIn } = useAuthSession();
@@ -18,7 +24,12 @@ export function useRequireSignIn() {
   const location = useLocation();
 
   return function allowSignedInAction(options?: GateOptions): boolean {
-    if (!isSignInRequired() || signedIn) return true;
+    const mode = options?.mode ?? "download";
+    const needsAuth =
+      mode === "account" ? !isDemoMode : isSignInRequired();
+
+    if (!needsAuth || signedIn) return true;
+
     const from = `${location.pathname}${location.search}${location.hash}`;
     const go = () => {
       navigate("/signin", { state: { from } });

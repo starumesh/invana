@@ -20,8 +20,9 @@ function messagingMode(): "demo" | "cloud" | "wa_me" {
 }
 
 /**
- * When true, Download / Publish / Share require sign-in in Connected Mode.
- * Demo Mode never gates. Default: true (unset = require sign-in when Connected).
+ * When true, Download requires sign-in in Connected Mode.
+ * Publish / Share always require sign-in when Connected.
+ * Demo Mode never gates. Default: true (unset = require sign-in for download).
  */
 export function isSignInRequired(): boolean {
   if (isDemoMode) return false;
@@ -32,6 +33,7 @@ export function isSignInRequired(): boolean {
 export const auth: AuthProvider = isDemoMode ? demoAuth : supabaseAuth;
 /** Default Connected adapter; prefer `activePersistence()` so guests can edit locally before sign-in. */
 export const persistence: PersistenceProvider = isDemoMode ? demoPersistence : supabasePersistence;
+/** Default Connected adapter; prefer `activeStorage()` so guests keep browser-local media until sign-in. */
 export const storage: StorageProvider = isDemoMode ? demoStorage : supabaseStorage;
 
 export const messaging: MessagingProvider =
@@ -51,6 +53,15 @@ export function hasAuthSession(): boolean {
 export function activePersistence(): PersistenceProvider {
   if (isDemoMode) return demoPersistence;
   return hasAuthSession() ? supabasePersistence : demoPersistence;
+}
+
+/**
+ * Media uploads: Supabase Storage when signed in to Connected Mode,
+ * otherwise browser object/data URLs (Demo Mode or signed-out guest).
+ */
+export function activeStorage(): StorageProvider {
+  if (isDemoMode) return demoStorage;
+  return hasAuthSession() ? supabaseStorage : demoStorage;
 }
 
 /**

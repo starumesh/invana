@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Field";
 import { PublishIcon } from "@/components/ui/Icons";
 import { normalizeSlug, suggestSlug } from "@/lib/slug";
+import { listTakenSlugs } from "@/api/events";
 import { inviteUrl } from "@/lib/url";
-import { activePersistence } from "@/services";
 
 type Props = {
   eventId: string;
@@ -24,7 +24,7 @@ export function PublishPanel({ eventId, titleParts, currentSlug, status, onPubli
   const partsKey = titleParts.join("|");
 
   useEffect(() => {
-    void activePersistence().takenSlugs(eventId).then(setTaken);
+    void listTakenSlugs(eventId).then(setTaken);
   }, [eventId]);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function PublishPanel({ eventId, titleParts, currentSlug, status, onPubli
   const available = Boolean(normalized) && !taken.includes(normalized);
 
   async function publish() {
-    if (!allowSignedInAction()) return;
+    if (!allowSignedInAction({ mode: "account" })) return;
     setError("");
     if (!available) {
       setError("That link is taken. Try another.");

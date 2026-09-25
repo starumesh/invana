@@ -1,29 +1,29 @@
 -- Storage bucket for event media (run in SQL editor or via Dashboard → Storage)
+-- Public read so published invites can load host photos without auth.
+-- Insert/update/delete remain owner-only (path prefix = auth.uid()).
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'event-media',
   'event-media',
-  false,
+  true,
   10485760, -- 10 MB
-  array['image/jpeg', 'image/png', 'image/webp']
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 )
 on conflict (id) do update set
+  public = excluded.public,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
 -- Path convention: {user_id}/{event_id}/{filename}
 
+-- Public read (invite guests + getPublicUrl). Writes stay owner-scoped below.
 drop policy if exists "event_media_storage_select_own" on storage.objects;
-create policy "event_media_storage_select_own"
+drop policy if exists "event_media_storage_select_public" on storage.objects;
+create policy "event_media_storage_select_public"
   on storage.objects for select
-  using (
-    bucket_id = 'event-media'
-    and auth.uid()::text = (storage.foldername(name))[1]
-  );
+  using (bucket_id = 'event-media');
 
--- Published event media readable by anyone with the signed/public URL path.
--- Prefer signed URLs from the client; this policy allows owners to read their objects.
 drop policy if exists "event_media_storage_insert_own" on storage.objects;
 create policy "event_media_storage_insert_own"
   on storage.objects for insert

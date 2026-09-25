@@ -5,4 +5,4 @@ Disallow: /builder/
 Disallow: /dashboard
 Disallow: /signin
 
-Sitemap: https://invana.vercel.app/sitemap.xml
+Sitemap: https://invana.stream/sitemap.xml

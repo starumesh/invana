@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { TemplateThumb } from "@/components/templates/TemplateThumb";
+import { TemplateCard } from "@/components/templates/TemplateCard";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Field";
 import { CARD_TYPES, normalizeCardType } from "@/config/card-types";
 import { EVENT_TYPES, getEventType } from "@/config/event-types";
-import { createDraft } from "@/lib/drafts";
+import { createEventDraft } from "@/api/events";
 import { trackTemplateUse } from "@/lib/analytics";
 import { getTemplate, templatesForCard, templatesForEvent } from "@/templates/registry";
 import type { CardTypeId, EventTypeId } from "@/types";
@@ -44,7 +44,7 @@ function CreateTabs({ tab }: { tab: Tab }) {
 function InvitationCreate({ eventType }: { eventType: EventTypeId }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const preferred = params.get("template");
   const templates = templatesForEvent(eventType);
 
@@ -54,7 +54,8 @@ function InvitationCreate({ eventType }: { eventType: EventTypeId }) {
   }, [templates, preferred]);
 
   async function start(templateId: string) {
-    setBusy(true);
+    if (busyId) return;
+    setBusyId(templateId);
     try {
       const template = getTemplate(templateId);
       if (template) {
@@ -65,10 +66,11 @@ function InvitationCreate({ eventType }: { eventType: EventTypeId }) {
           eventType,
         });
       }
-      const draft = await createDraft({ templateId, eventType });
+      // API is local-first — navigate as soon as the draft is in localStorage.
+      const draft = await createEventDraft({ templateId, eventType });
       navigate(`/builder/${draft.id}`);
-    } finally {
-      setBusy(false);
+    } catch {
+      setBusyId(null);
     }
   }
 
@@ -91,25 +93,20 @@ function InvitationCreate({ eventType }: { eventType: EventTypeId }) {
         </Select>
       </div>
 
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <p className="mt-8 text-sm text-ink-muted">Tap a look to start — Use is on every card.</p>
+
+      <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {ordered.map((template, index) => (
-          <div
+          <TemplateCard
             key={template.id}
-            className="group space-y-3 animate-fade-up"
+            template={template}
+            eventType={eventType}
+            highlighted={preferred === template.id}
+            busy={busyId === template.id}
+            className="animate-fade-up"
             style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
-          >
-            <TemplateThumb
-              template={template}
-              eventType={eventType}
-              className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-lift"
-            />
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-medium">{template.name}</p>
-              <Button type="button" size="sm" disabled={busy} onClick={() => void start(template.id)}>
-                Use
-              </Button>
-            </div>
-          </div>
+            onUse={() => void start(template.id)}
+          />
         ))}
       </div>
 
@@ -129,7 +126,7 @@ function CardCreate() {
   // Bio Data is the default Cards selection; legacy ?card=marriage-bio resolves to bio.
   const initial = normalizeCardType(params.get("card")) ?? CARD_TYPES[0].id;
   const [cardType, setCardType] = useState<CardTypeId>(initial);
-  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const preferred = params.get("template");
   const templates = templatesForCard(cardType);
 
@@ -139,7 +136,8 @@ function CardCreate() {
   }, [templates, preferred]);
 
   async function start(templateId: string) {
-    setBusy(true);
+    if (busyId) return;
+    setBusyId(templateId);
     try {
       const template = getTemplate(templateId);
       if (template) {
@@ -150,10 +148,11 @@ function CardCreate() {
           cardType,
         });
       }
-      const draft = await createDraft({ templateId, cardType });
+      // API is local-first — navigate as soon as the draft is in localStorage.
+      const draft = await createEventDraft({ templateId, cardType });
       navigate(`/builder/${draft.id}`);
-    } finally {
-      setBusy(false);
+    } catch {
+      setBusyId(null);
     }
   }
 
@@ -176,25 +175,20 @@ function CardCreate() {
         </Select>
       </div>
 
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <p className="mt-8 text-sm text-ink-muted">Tap a look to start — Use is on every card.</p>
+
+      <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {ordered.map((template, index) => (
-          <div
+          <TemplateCard
             key={template.id}
-            className="group space-y-3 animate-fade-up"
+            template={template}
+            cardType={cardType}
+            highlighted={preferred === template.id}
+            busy={busyId === template.id}
+            className="animate-fade-up"
             style={{ animationDelay: `${index * 40}ms` }}
-          >
-            <TemplateThumb
-              template={template}
-              cardType={cardType}
-              className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-lift"
-            />
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-medium">{template.name}</p>
-              <Button type="button" size="sm" disabled={busy} onClick={() => void start(template.id)}>
-                Use
-              </Button>
-            </div>
-          </div>
+            onUse={() => void start(template.id)}
+          />
         ))}
       </div>
 

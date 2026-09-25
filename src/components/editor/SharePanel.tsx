@@ -24,7 +24,7 @@ export function SharePanel({ slug, title, defaultMessage, published = false }: P
   const link = inviteUrl(slug);
 
   async function onShare() {
-    if (!allowSignedInAction()) return;
+    if (!allowSignedInAction({ mode: "account" })) return;
     setBusy(true);
     try {
       const recipients = uniquePhones(phones.split(/[\n,;]+/));
@@ -60,7 +60,7 @@ export function SharePanel({ slug, title, defaultMessage, published = false }: P
             type="button"
             variant="secondary"
             onClick={() => {
-              if (!allowSignedInAction()) return;
+              if (!allowSignedInAction({ mode: "account" })) return;
               void navigator.clipboard.writeText(link);
             }}
           >
@@ -71,7 +71,7 @@ export function SharePanel({ slug, title, defaultMessage, published = false }: P
             variant="secondary"
             disabled={!published}
             onClick={() => {
-              if (!allowSignedInAction()) return;
+              if (!allowSignedInAction({ mode: "account" })) return;
               window.open(link, "_blank", "noopener,noreferrer");
             }}
           >

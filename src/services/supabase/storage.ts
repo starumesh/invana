@@ -6,7 +6,7 @@ const BUCKET = "event-media";
 
 /**
  * Uploads to Supabase Storage. Host must be signed in.
- * Returns a signed URL (1 hour) for private bucket objects.
+ * Returns a public object URL (bucket is public-read; writes remain owner-only via RLS).
  */
 export const supabaseStorage: StorageProvider = {
   async uploadImage(opts) {
@@ -27,14 +27,14 @@ export const supabaseStorage: StorageProvider = {
     });
     if (uploadError) throw new Error(uploadError.message);
 
-    const { data: signed, error: signError } = await sb.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
-    if (signError || !signed?.signedUrl) {
-      throw new Error(signError?.message ?? "Could not create a signed URL for the upload.");
+    const { data: publicData } = sb.storage.from(BUCKET).getPublicUrl(path);
+    if (!publicData?.publicUrl) {
+      throw new Error("Could not resolve a public URL for the upload.");
     }
 
     return {
       path,
-      url: signed.signedUrl,
+      url: publicData.publicUrl,
       mimeType: opts.file.type || "image/jpeg",
       byteSize: opts.file.size,
     };

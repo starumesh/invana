@@ -283,8 +283,9 @@ export function HomePage() {
             <Link
               key={sample.key}
               to={sample.href}
-              className="group block animate-fade-up"
+              className="group block animate-fade-up rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
               style={{ animationDelay: `${Math.min(index, 6) * 40}ms` }}
+              aria-label={`Use ${sample.label}`}
               onClick={() =>
                 trackTemplateClick({
                   templateId: sample.template.id,
@@ -296,20 +297,27 @@ export function HomePage() {
                 })
               }
             >
-              <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card transition duration-300 group-hover:-translate-y-1 group-hover:border-gold/35 group-hover:shadow-lift">
+              <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card transition duration-300 group-hover:-translate-y-1 group-hover:border-gold/35 group-hover:shadow-lift group-focus-visible:-translate-y-1 group-focus-visible:border-gold/35 group-focus-visible:shadow-lift">
                 <TemplateThumb
                   template={sample.template}
                   eventType={sample.eventType}
                   cardType={sample.cardType}
                   className="overflow-hidden rounded-none border-0 shadow-none"
                 />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/75 via-ink/25 to-transparent px-2.5 pb-2.5 pt-10 opacity-0 transition duration-300 group-hover:opacity-100">
-                  <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-cream">Start free</span>
-                </div>
               </div>
-              <div className="mt-2.5 min-w-0">
-                <p className="truncate text-sm font-medium text-ink group-hover:text-gold-dark">{sample.label}</p>
-                <p className="truncate text-xs text-ink-muted">{sample.template.name}</p>
+              <div className="mt-2.5 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink group-hover:text-gold-dark group-focus-visible:text-gold-dark">
+                    {sample.label}
+                  </p>
+                  <p className="truncate text-xs text-ink-muted">{sample.template.name}</p>
+                </div>
+                <span
+                  className="inline-flex shrink-0 items-center rounded-full bg-ink px-2.5 py-1 text-[11px] font-medium tracking-tight text-cream"
+                  aria-hidden
+                >
+                  Use
+                </span>
               </div>
             </Link>
           ))}

@@ -6,6 +6,8 @@ import { trackDownload } from "@/lib/analytics";
 import { displayTitle } from "@/lib/fields";
 import { downloadBlob, exportImage, exportPdf } from "@/lib/export";
 import { Composition } from "@/lib/render/Composition";
+import { requiredFieldsError } from "@/lib/validation";
+import { fieldSpecsForInput } from "@/templates/fields";
 import { getTemplate } from "@/templates/registry";
 import type { StoredEvent } from "@/types";
 
@@ -36,6 +38,11 @@ export function DashboardDownloadPanel({ event }: Props) {
 
   async function onPng() {
     if (!allowSignedInAction()) return;
+    const missing = requiredFieldsError(fieldSpecsForInput(event.config, template), event.config.fields);
+    if (missing) {
+      setError(missing);
+      return;
+    }
     setBusy("png");
     setError("");
     try {
@@ -58,6 +65,11 @@ export function DashboardDownloadPanel({ event }: Props) {
 
   async function onPdf() {
     if (!allowSignedInAction()) return;
+    const missing = requiredFieldsError(fieldSpecsForInput(event.config, template), event.config.fields);
+    if (missing) {
+      setError(missing);
+      return;
+    }
     setBusy("pdf");
     setError("");
     try {

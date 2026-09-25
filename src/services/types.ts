@@ -7,6 +7,8 @@ export interface PersistenceProvider {
   saveEvent(event: StoredEvent): Promise<StoredEvent>;
   deleteEvent(id: string): Promise<void>;
   listRsvps(eventId: string): Promise<Rsvp[]>;
+  /** Optional batch RSVP fetch (one round-trip). Falls back to per-event if omitted. */
+  listRsvpsForEventIds?(eventIds: string[]): Promise<Rsvp[]>;
   addRsvp(rsvp: Rsvp): Promise<Rsvp>;
   /** Slugs in use; pass `excludeEventId` so an event can keep (or reclaim) its own slug. */
   takenSlugs(excludeEventId?: string): Promise<string[]>;

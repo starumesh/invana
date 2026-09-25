@@ -1,10 +1,7 @@
 import type { AuthProvider } from "@/services/types";
 import { requireSupabase } from "@/lib/supabase/client";
 import type { DemoUser } from "@/types";
-import type { Session, User } from "@supabase/supabase-js";
-
-/** Shared MVP OTP (not emailed). Override with VITE_DEV_OTP. */
-export const DEV_OTP = (import.meta.env.VITE_DEV_OTP?.trim() || "123456");
+import type { AuthError, Session, User } from "@supabase/supabase-js";
 
 function mapUser(user: User | null | undefined): DemoUser | null {
   if (!user) return null;
@@ -19,32 +16,45 @@ function mapUser(user: User | null | undefined): DemoUser | null {
   };
 }
 
+function mapAuthError(error: AuthError | null | undefined, fallback: string): string {
+  const msg = error?.message?.trim() || "";
+  if (/email not confirmed/i.test(msg)) {
+    return "Please confirm your email from your inbox, then sign in.";
+  }
+  if (/invalid login credentials/i.test(msg)) {
+    return "Wrong email or password. Try again, or create a new account.";
+  }
+  if (/user already registered/i.test(msg)) {
+    return "An account with this email already exists. Sign in instead.";
+  }
+  return msg || fallback;
+}
+
 let cached: DemoUser | null = null;
 let listening = false;
+
+function setCachedFromSession(session: Session | null | undefined) {
+  cached = mapUser(session?.user);
+}
 
 function ensureListener() {
   if (listening) return;
   listening = true;
   const sb = requireSupabase();
-  sb.auth.onAuthStateChange((_event, session: Session | null) => {
-    cached = mapUser(session?.user);
-  });
-  void sb.auth.getSession().then(({ data }) => {
-    cached = mapUser(data.session?.user);
+  sb.auth.onAuthStateChange((_event, session) => {
+    setCachedFromSession(session);
   });
 }
 
 /**
- * Connected Mode auth — email + hardcoded OTP (no magic-link / no outbound mail).
- * OTP is stored as the Auth password for that email so Supabase still issues a real session.
- * Call `await supabaseAuth.ready()` once after app boot if you need session before first paint.
- *
- * Supabase dashboard: Authentication → Providers → Email → turn OFF "Confirm email".
+ * Connected Mode auth — email + password (Supabase Email provider).
+ * Dashboard: Authentication → Providers → Email enabled.
+ * For smooth first-time signup, turn OFF “Confirm email”.
  */
 export const supabaseAuth: AuthProvider & {
   ready: () => Promise<DemoUser | null>;
-  /** Email + OTP. OTP must match DEV_OTP / VITE_DEV_OTP (default 123456). */
-  signInWithEmailOtp: (email: string, otp: string) => Promise<{ error?: string }>;
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
+  signUpWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 } = {
   currentUser() {
@@ -63,34 +73,48 @@ export const supabaseAuth: AuthProvider & {
   async ready() {
     const sb = requireSupabase();
     const { data } = await sb.auth.getSession();
-    cached = mapUser(data.session?.user);
+    setCachedFromSession(data.session);
     ensureListener();
     return cached;
   },
-  async signInWithEmailOtp(email: string, otp: string) {
+  async signInWithPassword(email: string, password: string) {
     const trimmedEmail = email.trim().toLowerCase();
-    const trimmedOtp = otp.trim();
     if (!trimmedEmail) return { error: "Enter an email." };
-    if (trimmedOtp !== DEV_OTP) {
-      return { error: "That code doesn’t look right. Please try again." };
-    }
+    if (!password) return { error: "Enter a password." };
 
     const sb = requireSupabase();
-    const password = DEV_OTP;
-
-    const signIn = await sb.auth.signInWithPassword({
+    ensureListener();
+    const { data, error } = await sb.auth.signInWithPassword({
       email: trimmedEmail,
       password,
     });
 
-    if (!signIn.error && signIn.data.user) {
-      cached = mapUser(signIn.data.user);
-      ensureListener();
-      return {};
+    if (error) {
+      return { error: mapAuthError(error, "Couldn’t sign in. Check your email and password.") };
     }
 
-    // First time for this email — create the Auth user (requires Confirm email OFF).
-    const signUp = await sb.auth.signUp({
+    setCachedFromSession(data.session);
+    if (!cached) cached = mapUser(data.user);
+    if (!cached) {
+      // Session write can lag briefly — re-read storage.
+      const { data: again } = await sb.auth.getSession();
+      setCachedFromSession(again.session);
+    }
+    if (!cached) {
+      return { error: "Signed in, but no session was returned. Try again in a moment." };
+    }
+    return {};
+  },
+  async signUpWithPassword(email: string, password: string) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) return { error: "Enter an email." };
+    if (password.length < 6) {
+      return { error: "Password must be at least 6 characters." };
+    }
+
+    const sb = requireSupabase();
+    ensureListener();
+    const { data, error } = await sb.auth.signUp({
       email: trimmedEmail,
       password,
       options: {
@@ -98,23 +122,27 @@ export const supabaseAuth: AuthProvider & {
       },
     });
 
-    if (signUp.error) {
-      return { error: signUp.error.message };
+    if (error) {
+      return { error: mapAuthError(error, "Couldn’t create account.") };
     }
 
-    if (signUp.data.session?.user) {
-      cached = mapUser(signUp.data.session.user);
-      ensureListener();
+    if (data.session) {
+      setCachedFromSession(data.session);
       return {};
     }
 
-    // Sign-up succeeded but no session — try password sign-in once more.
-    const retry = await sb.auth.signInWithPassword({ email: trimmedEmail, password });
+    // Confirm-email on: no session yet — try immediate password sign-in.
+    const retry = await sb.auth.signInWithPassword({
+      email: trimmedEmail,
+      password,
+    });
     if (retry.error) {
-      return { error: retry.error.message || "Couldn’t sign in. Please try again." };
+      return {
+        error: "Account created. Confirm your email from your inbox, then sign in.",
+      };
     }
-    cached = mapUser(retry.data.user);
-    ensureListener();
+    setCachedFromSession(retry.data.session);
+    if (!cached) cached = mapUser(retry.data.user);
     return {};
   },
   async signOut() {

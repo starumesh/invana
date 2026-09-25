@@ -8,6 +8,28 @@ Apply in order from the Supabase SQL editor (or CLI):
 2. `migrations/20260324000001_rls.sql` — Row Level Security
 3. `migrations/20260324000002_storage.sql` — `event-media` bucket + policies
 
+### Storage bucket (required for signed-in photo uploads)
+
+If builder uploads fail with bucket/policy errors, or objects never appear under **Storage**, apply the storage migration (or run the steps below).
+
+**SQL editor** — paste and run `migrations/20260324000002_storage.sql` in full.
+
+**Or Dashboard:**
+
+1. **Storage → New bucket**
+   - Name: `event-media`
+   - Public bucket: **ON** (invite guests need to load photos via public URLs)
+   - File size limit: `10485760` (10 MB)
+   - Allowed MIME types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
+2. If the bucket already exists but is private: open it → **Configuration** → set **Public** to on (or re-run the migration `on conflict` update).
+3. **Storage → Policies** for `event-media` (or run the SQL policies in the migration):
+   - **SELECT** — public read (`bucket_id = 'event-media'`)
+   - **INSERT / UPDATE / DELETE** — owner only: first path folder equals `auth.uid()`
+
+Object path convention: `{user_id}/{event_id}/{filename}`.
+
+Signed-in uploads use `activeStorage()` → `supabaseStorage` and save the **public URL** into event field values. Demo Mode / signed-out guests keep browser-local object URLs.
+
 ## Tables (V1)
 
 | Table | Purpose |

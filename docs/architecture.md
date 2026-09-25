@@ -25,7 +25,7 @@ Both surfaces read the same `RenderInput`. Field resolution (`lib/fields.ts`) tu
 | `PersistenceProvider` | `localStorage` (`services/demo.ts`) | Supabase `events` / `rsvps` |
 | `AuthProvider` | local demo user | Magic-link via `services/supabase/auth.ts` |
 | `MessagingProvider` | `wa.me` links | `wa.me` by default; Cloud API when `VITE_MESSAGING_MODE=cloud` |
-| `StorageProvider` | object URLs | Supabase Storage `event-media` |
+| `StorageProvider` | object URLs (`activeStorage` → demo) | Supabase Storage `event-media` public URLs when signed in |
 
 `src/services/index.ts` selects Demo when `VITE_SUPABASE_URL` / publishable key are unset.
 

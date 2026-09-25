@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { messagesFor } from "@/config/welcome-messages";
 import { Input, Label, Select, Textarea } from "@/components/ui/Field";
-import { fileToDataUrl } from "@/lib/url";
+import { activeStorage } from "@/services";
 import type { DateValue, EventTypeId, FieldSpec, TimeValue } from "@/types";
 
 type Props = {
   fields: FieldSpec[];
   values: Record<string, unknown>;
   eventType?: EventTypeId;
+  eventId?: string;
   onChange: (key: string, value: unknown) => void;
 };
 
@@ -15,7 +16,7 @@ const OPTIONAL_GROUP = "More details";
 const PHOTO_GROUPS = new Set(["Photo", "Photos"]);
 const COVER_CROP_HINT = "Portrait or landscape — we’ll cover-crop to the frame.";
 
-export function DynamicFields({ fields, values, eventType, onChange }: Props) {
+export function DynamicFields({ fields, values, eventType, eventId, onChange }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
   const primary = fields.filter((field) => field.group !== OPTIONAL_GROUP);
   const optional = fields.filter((field) => field.group === OPTIONAL_GROUP);
@@ -52,6 +53,7 @@ export function DynamicFields({ fields, values, eventType, onChange }: Props) {
                       spec={spec}
                       value={values[spec.key]}
                       eventType={eventType}
+                      eventId={eventId}
                       onChange={onChange}
                       compactImage={isPhotoSection}
                     />
@@ -86,7 +88,13 @@ export function DynamicFields({ fields, values, eventType, onChange }: Props) {
                   key={spec.key}
                   className={spec.type === "textarea" || spec.type === "image" ? "sm:col-span-2" : ""}
                 >
-                  <FieldControl spec={spec} value={values[spec.key]} eventType={eventType} onChange={onChange} />
+                  <FieldControl
+                    spec={spec}
+                    value={values[spec.key]}
+                    eventType={eventType}
+                    eventId={eventId}
+                    onChange={onChange}
+                  />
                 </div>
               ))}
             </div>
@@ -103,26 +111,41 @@ function hasValue(value: unknown): boolean {
   return Boolean(value);
 }
 
+function isCompleteTime(value: unknown): value is TimeValue {
+  if (!value || typeof value !== "object") return false;
+  const time = value as TimeValue;
+  return Number.isInteger(time.hour) && Number.isInteger(time.minute);
+}
+
 function FieldControl({
   spec,
   value,
   eventType,
+  eventId,
   onChange,
   compactImage = false,
 }: {
   spec: FieldSpec;
   value: unknown;
   eventType?: EventTypeId;
+  eventId?: string;
   onChange: (key: string, value: unknown) => void;
   compactImage?: boolean;
 }) {
   const id = `field-${spec.key}`;
 
   if (spec.type === "date") {
-    const date = (value as DateValue | undefined) ?? { day: 1, month: 1, year: 2026 };
+    const yearNow = new Date().getFullYear();
+    const date = (value as DateValue | undefined) ?? { year: yearNow };
+    const day = date.day ?? "";
+    const month = date.month ?? "";
+    const year = date.year ?? yearNow;
     return (
       <div>
-        <Label>{spec.label}</Label>
+        <Label>
+          {spec.label}
+          {spec.required ? " *" : ""}
+        </Label>
         <div className="grid grid-cols-3 gap-2">
           <div>
             <Label htmlFor={`${id}-day`}>Day</Label>
@@ -131,8 +154,16 @@ function FieldControl({
               type="number"
               min={1}
               max={31}
-              value={date.day}
-              onChange={(e) => onChange(spec.key, { ...date, day: Number(e.target.value) })}
+              placeholder="DD"
+              value={day}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onChange(spec.key, {
+                  ...date,
+                  year,
+                  day: raw === "" ? null : Number(raw),
+                });
+              }}
             />
           </div>
           <div>
@@ -142,8 +173,16 @@ function FieldControl({
               type="number"
               min={1}
               max={12}
-              value={date.month}
-              onChange={(e) => onChange(spec.key, { ...date, month: Number(e.target.value) })}
+              placeholder="MM"
+              value={month}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onChange(spec.key, {
+                  ...date,
+                  year,
+                  month: raw === "" ? null : Number(raw),
+                });
+              }}
             />
           </div>
           <div>
@@ -153,8 +192,13 @@ function FieldControl({
               type="number"
               min={2020}
               max={2100}
-              value={date.year}
-              onChange={(e) => onChange(spec.key, { ...date, year: Number(e.target.value) })}
+              value={year}
+              onChange={(e) =>
+                onChange(spec.key, {
+                  ...date,
+                  year: Number(e.target.value) || yearNow,
+                })
+              }
             />
           </div>
         </div>
@@ -163,12 +207,16 @@ function FieldControl({
   }
 
   if (spec.type === "time") {
-    const time = (value as TimeValue | undefined) ?? { hour: 18, minute: 30, format: "12h" as const };
-    const hour12 = time.hour % 12 || 12;
-    const period = time.hour >= 12 ? "PM" : "AM";
+    const time = isCompleteTime(value) ? value : undefined;
+    const hour12 = time ? time.hour % 12 || 12 : "";
+    const minute = time ? time.minute : "";
+    const period = time ? (time.hour >= 12 ? "PM" : "AM") : "AM";
     return (
       <div>
-        <Label>{spec.label}</Label>
+        <Label>
+          {spec.label}
+          {spec.required ? " *" : ""}
+        </Label>
         <div className="grid grid-cols-3 gap-2">
           <div>
             <Label htmlFor={`${id}-hour`}>Hour</Label>
@@ -177,11 +225,21 @@ function FieldControl({
               type="number"
               min={1}
               max={12}
+              placeholder="—"
               value={hour12}
               onChange={(e) => {
-                const next = Number(e.target.value);
+                const raw = e.target.value;
+                if (raw === "") {
+                  onChange(spec.key, undefined);
+                  return;
+                }
+                const next = Number(raw);
                 const hour24 = period === "PM" ? (next % 12) + 12 : next % 12;
-                onChange(spec.key, { ...time, hour: hour24 });
+                onChange(spec.key, {
+                  hour: hour24,
+                  minute: time?.minute ?? 0,
+                  format: "12h" as const,
+                });
               }}
             />
           </div>
@@ -192,8 +250,20 @@ function FieldControl({
               type="number"
               min={0}
               max={59}
-              value={time.minute}
-              onChange={(e) => onChange(spec.key, { ...time, minute: Number(e.target.value) })}
+              placeholder="—"
+              value={minute}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "" && !time) {
+                  onChange(spec.key, undefined);
+                  return;
+                }
+                onChange(spec.key, {
+                  hour: time?.hour ?? (period === "PM" ? 12 : 0),
+                  minute: raw === "" ? 0 : Number(raw),
+                  format: "12h" as const,
+                });
+              }}
             />
           </div>
           <div>
@@ -203,11 +273,11 @@ function FieldControl({
               value={period}
               onChange={(e) => {
                 const nextPeriod = e.target.value;
-                const base = time.hour % 12;
+                const base = time ? time.hour % 12 : 0;
                 onChange(spec.key, {
-                  ...time,
-                  format: "12h",
                   hour: nextPeriod === "PM" ? base + 12 : base,
+                  minute: time?.minute ?? 0,
+                  format: "12h" as const,
                 });
               }}
             >
@@ -222,23 +292,29 @@ function FieldControl({
 
   if (spec.type === "message") {
     const options = messagesFor(eventType);
-    const current = typeof value === "string" ? value : options[0] ?? "";
-    const selectValue = options.includes(current) ? current : "__custom__";
+    const current = typeof value === "string" ? value : "";
+    const selectValue = options.includes(current) ? current : current ? "__custom__" : "";
     return (
       <div className="space-y-3">
         <div>
-          <Label htmlFor={id}>{spec.label}</Label>
+          <Label htmlFor={id}>
+            {spec.label}
+            {spec.required ? " *" : ""}
+          </Label>
           <Select
             id={id}
             value={selectValue}
             onChange={(e) => {
-              if (e.target.value === "__custom__") {
+              if (e.target.value === "") {
+                onChange(spec.key, "");
+              } else if (e.target.value === "__custom__") {
                 onChange(spec.key, options.includes(current) ? "" : current);
               } else {
                 onChange(spec.key, e.target.value);
               }
             }}
           >
+            <option value="">Select a message…</option>
             {options.map((option) => (
               <option key={option} value={option}>
                 {option}
@@ -265,6 +341,7 @@ function FieldControl({
         id={id}
         label={spec.label}
         value={value}
+        eventId={eventId}
         compact={compactImage}
         onChange={(next) => onChange(spec.key, next)}
       />
@@ -329,21 +406,33 @@ function ImageField({
   id,
   label,
   value,
+  eventId,
   compact,
   onChange,
 }: {
   id: string;
   label: string;
   value: unknown;
+  eventId?: string;
   compact: boolean;
   onChange: (next: string) => void;
 }) {
   const src = typeof value === "string" ? value : "";
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   async function handleFile(file: File | undefined) {
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    onChange(dataUrl);
+    setUploading(true);
+    setUploadError("");
+    try {
+      const uploaded = await activeStorage().uploadImage({ file, eventId });
+      onChange(uploaded.url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   if (compact) {
@@ -364,15 +453,22 @@ function ImageField({
             <Input
               id={id}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              disabled={uploading}
               className="py-2 text-xs file:mr-2 file:rounded-md file:border-0 file:bg-cream-dark file:px-2 file:py-1 file:text-xs file:text-ink"
               onChange={(e) => void handleFile(e.target.files?.[0])}
             />
+            {uploading ? <p className="mt-1.5 text-xs text-ink-muted">Uploading…</p> : null}
+            {uploadError ? <p className="mt-1.5 text-xs text-red-700">{uploadError}</p> : null}
             {src ? (
               <button
                 type="button"
                 className="mt-1.5 text-xs text-ink-muted underline"
-                onClick={() => onChange("")}
+                disabled={uploading}
+                onClick={() => {
+                  setUploadError("");
+                  onChange("");
+                }}
               >
                 Remove
               </button>
@@ -390,15 +486,26 @@ function ImageField({
         <Input
           id={id}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          disabled={uploading}
           onChange={(e) => void handleFile(e.target.files?.[0])}
         />
         {src ? (
-          <button type="button" className="text-sm text-ink-muted underline" onClick={() => onChange("")}>
+          <button
+            type="button"
+            className="text-sm text-ink-muted underline"
+            disabled={uploading}
+            onClick={() => {
+              setUploadError("");
+              onChange("");
+            }}
+          >
             Remove
           </button>
         ) : null}
       </div>
+      {uploading ? <p className="mt-2 text-sm text-ink-muted">Uploading…</p> : null}
+      {uploadError ? <p className="mt-2 text-sm text-red-700">{uploadError}</p> : null}
       {src ? (
         <img src={src} alt="" className="mt-3 h-28 w-28 rounded-xl object-cover ring-1 ring-stone-200" />
       ) : null}

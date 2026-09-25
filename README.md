@@ -38,15 +38,15 @@ npm run typecheck
 | `TemplateDefinition` + `RenderInput` | Canonical data for preview, export, and invite site |
 | `Composition` SVG renderer | Single render path (not a screenshot) |
 | `PersistenceProvider` / `AuthProvider` / `MessagingProvider` / `StorageProvider` | Interfaces; Demo vs Supabase adapters |
-| `HashRouter` + `base: './'` | GitHub Pages deep links without server rewrites |
+| `BrowserRouter` + Netlify SPA redirects | Path deep links on https://invana.stream |
 
 See [docs/architecture.md](docs/architecture.md), [docs/deployment.md](docs/deployment.md), [docs/whatsapp.md](docs/whatsapp.md), and [REQUIREMENTS.md](REQUIREMENTS.md).
 
 ## SEO notes
 
-Per-route `document.title`, description, keywords, and Open Graph / Twitter tags are applied via `Seo` / `usePageMeta` (`src/seo/`). `index.html` and `public/robots.txt` provide crawler fallbacks.
+Canonical site: **https://invana.stream**. Per-route `document.title`, description, keywords, and Open Graph / Twitter tags are applied via `Seo` / `usePageMeta` (`src/seo/`). `index.html`, `public/robots.txt`, and `public/sitemap.xml` provide crawler fallbacks. Netlify SPA fallback (`netlify.toml` / `public/_redirects`) keeps `/invite/:slug` and other path routes crawlable.
 
-**HashRouter caveat:** URLs look like `/#/invite/slug`. Most search engines treat the hash as client-only and do not index distinct hash routes as separate pages, so XML sitemaps of `#/` URLs have limited value. Titles and meta still help branded search, in-app tabs, and link previews when the JS-rendered document is fetched. Path-based routing (`BrowserRouter` + host SPA rewrites) would unlock stronger crawl SEO later — kept as HashRouter for static hosting (e.g. GitHub Pages) without a rewrite.
+Invite pages update meta client-side after the event loads (good for tabs and JS-capable clients). Link-preview bots that only read the static HTML shell still see homepage OG tags — **prerender or SSR for `/invite/*`** would improve WhatsApp/Facebook share cards later.
 
 ## Environment
 
@@ -56,7 +56,8 @@ Copy `.env.example`. Leave Supabase vars empty for Demo Mode:
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_MESSAGING_MODE=          # demo | wa_me | cloud
-VITE_PUBLIC_SITE_URL=         # optional absolute origin for share links
+VITE_PUBLIC_SITE_URL=https://invana.stream   # local: http://localhost:5173
+VITE_GA_MEASUREMENT_ID=       # optional GA4 (G-XXXXXXXX)
 ```
 
 Never put service-role keys, WhatsApp tokens, or other secrets in `VITE_*` vars.
@@ -85,9 +86,9 @@ VITE_PUBLIC_SITE_URL=http://localhost:5173
 
 | Target | Notes |
 |--------|--------|
-| **GitHub Pages** | Existing workflow; hash routes |
+| **Netlify (production)** | https://invana.stream — `netlify.toml` + `public/_redirects` SPA fallback |
 | **Vercel** | `vercel.json` SPA rewrites — [docs/deployment.md](docs/deployment.md) |
-| **Netlify** | `netlify.toml` SPA redirects |
+| **GitHub Pages** | Existing workflow; hash routes (legacy) |
 
 ### GitHub Pages
 

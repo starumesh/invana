@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isDateValue, isTimeValue } from "@/lib/date";
+import type { FieldSpec } from "@/types";
 
 export const dateSchema = z.object({
   day: z.number().int().min(1).max(31),
@@ -51,4 +53,35 @@ export function uniquePhones(values: string[]): string[] {
     result.push(phone);
   }
   return result;
+}
+
+function isFieldFilled(spec: FieldSpec, value: unknown): boolean {
+  if (spec.type === "date") return isDateValue(value);
+  if (spec.type === "time") return isTimeValue(value);
+  if (spec.type === "image") return typeof value === "string" && value.trim().length > 0;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number" && Number.isFinite(value)) return true;
+  return false;
+}
+
+/** Labels of required fields that are still empty. */
+export function missingRequiredLabels(
+  specs: FieldSpec[],
+  fields: Record<string, unknown> | undefined,
+): string[] {
+  const values = fields ?? {};
+  return specs
+    .filter((spec) => spec.required && !isFieldFilled(spec, values[spec.key]))
+    .map((spec) => spec.label);
+}
+
+/** User-facing error, or null when all required fields are filled. */
+export function requiredFieldsError(
+  specs: FieldSpec[],
+  fields: Record<string, unknown> | undefined,
+): string | null {
+  const missing = missingRequiredLabels(specs, fields);
+  if (!missing.length) return null;
+  if (missing.length === 1) return `Please enter ${missing[0]} before continuing.`;
+  return `Please enter required details: ${missing.join(", ")}.`;
 }

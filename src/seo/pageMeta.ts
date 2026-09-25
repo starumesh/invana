@@ -1,5 +1,5 @@
 import { EVENT_TYPES, getEventType } from "@/config/event-types";
-import { publicOrigin } from "@/lib/url";
+import { CANONICAL_SITE_URL, publicOrigin } from "@/lib/url";
 import type { EventTypeId } from "@/types";
 
 export type PageMeta = {
@@ -15,7 +15,7 @@ export type PageMeta = {
 export const SITE_NAME = "Invana";
 
 export const DEFAULT_KEYWORDS =
-  "digital invitations, online invitation, wedding invitation, birthday invitation, event invite, invitation card, bio data, biodata, marriage biodata, matrimony bio data, bio data format, create invitation online, free invitation maker, Invana";
+  "digital invitations, online invitation, wedding invitation, birthday invitation, event invite, invitation card, bio data, biodata, marriage biodata, matrimony bio data, bio data format, create invitation online, free invitation maker, WhatsApp invitation, RSVP online, Invana";
 
 export const DEFAULT_META: PageMeta = {
   title: "Invana — Free Digital Invitations & Bio Data Cards Online",
@@ -49,8 +49,8 @@ function setLink(rel: string, href: string) {
 
 /** Absolute URL for the current path (share/OG/canonical). */
 export function currentCanonicalUrl(): string {
-  const origin = publicOrigin();
-  if (typeof window === "undefined") return origin ? `${origin}/` : "";
+  const origin = publicOrigin() || CANONICAL_SITE_URL;
+  if (typeof window === "undefined") return `${origin}/`;
   const path = window.location.pathname || "/";
   const search = window.location.search || "";
   return `${origin}${path}${search}`;
@@ -62,8 +62,8 @@ export function applyPageMeta(meta: PageMeta) {
   const keywords = meta.keywords ?? DEFAULT_KEYWORDS;
   const type = meta.type ?? "website";
   const url = currentCanonicalUrl();
-  const origin = publicOrigin();
-  const image = meta.image || (origin ? `${origin}/og-default.svg` : "/og-default.svg");
+  const origin = publicOrigin() || CANONICAL_SITE_URL;
+  const image = meta.image || `${origin}/og-default.svg`;
 
   document.title = title;
 
@@ -82,6 +82,7 @@ export function applyPageMeta(meta: PageMeta) {
   setMeta("property", "og:type", type);
   setMeta("property", "og:url", url);
   setMeta("property", "og:image", image);
+  setMeta("property", "og:locale", "en_IN");
 
   setMeta("name", "twitter:card", "summary_large_image");
   setMeta("name", "twitter:title", title);
@@ -90,7 +91,7 @@ export function applyPageMeta(meta: PageMeta) {
 
   if (meta.noIndex) {
     setLink("canonical", url);
-  } else if (origin) {
+  } else {
     const path = typeof window !== "undefined" ? window.location.pathname || "/" : "/";
     setLink("canonical", `${origin}${path === "/" ? "/" : path}`);
   }
@@ -172,7 +173,7 @@ export function metaForPath(pathname: string): PageMeta {
       title: `You're Invited | ${SITE_NAME}`,
       description:
         "View this event invitation online, check the details, and RSVP. Shared with Invana — digital invitations and WhatsApp invite links.",
-      keywords: `${DEFAULT_KEYWORDS}, online RSVP`,
+      keywords: `${DEFAULT_KEYWORDS}, online RSVP, digital invitation link`,
       type: "article",
     };
   }

@@ -17,6 +17,8 @@ type Props = {
   onMaximizedChange?: (open: boolean) => void;
   /** Flush builder draft before redirecting unsigned users to sign-in. */
   ensureSaved?: () => void | Promise<void>;
+  /** Return an error message to block download when required fields are missing. */
+  validateBeforeDownload?: () => string | null;
 };
 
 export function PreviewPanel({
@@ -27,10 +29,12 @@ export function PreviewPanel({
   maximized: maximizedProp,
   onMaximizedChange,
   ensureSaved,
+  validateBeforeDownload,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [internalOpen, setInternalOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [exportError, setExportError] = useState("");
   const maximized = maximizedProp ?? internalOpen;
   const allowSignedInAction = useRequireSignIn();
 
@@ -73,31 +77,52 @@ export function PreviewPanel({
   }
 
   async function onPng() {
+    const missing = validateBeforeDownload?.() ?? null;
+    if (missing) {
+      // Builder already surfaces this via formError — avoid a second copy here.
+      setExportError(validateBeforeDownload ? "" : missing);
+      return;
+    }
     if (!allowSignedInAction({ beforeRedirect: ensureSaved })) return;
-    const svg = await getSvg();
-    const blob = await exportImage(svg, "high", "image/png");
-    downloadBlob(blob, `${filenameBase}.png`);
-    trackDownload({
-      templateId: template.id,
-      templateName: template.name,
-      kind: template.kind,
-      format: "png",
-      source: "builder",
-    });
+    setExportError("");
+    try {
+      const svg = await getSvg();
+      const blob = await exportImage(svg, "high", "image/png");
+      downloadBlob(blob, `${filenameBase}.png`);
+      trackDownload({
+        templateId: template.id,
+        templateName: template.name,
+        kind: template.kind,
+        format: "png",
+        source: "builder",
+      });
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Download failed.");
+    }
   }
 
   async function onPdf() {
+    const missing = validateBeforeDownload?.() ?? null;
+    if (missing) {
+      setExportError(validateBeforeDownload ? "" : missing);
+      return;
+    }
     if (!allowSignedInAction({ beforeRedirect: ensureSaved })) return;
-    const svg = await getSvg();
-    const blob = await exportPdf(svg, template);
-    downloadBlob(blob, `${filenameBase}.pdf`);
-    trackDownload({
-      templateId: template.id,
-      templateName: template.name,
-      kind: template.kind,
-      format: "pdf",
-      source: "builder",
-    });
+    setExportError("");
+    try {
+      const svg = await getSvg();
+      const blob = await exportPdf(svg, template);
+      downloadBlob(blob, `${filenameBase}.pdf`);
+      trackDownload({
+        templateId: template.id,
+        templateName: template.name,
+        kind: template.kind,
+        format: "pdf",
+        source: "builder",
+      });
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Download failed.");
+    }
   }
 
   const modal =
@@ -114,6 +139,7 @@ export function PreviewPanel({
               <div>
                 <p className="text-xs uppercase tracking-[0.16em] text-cream/60">Preview</p>
                 <p className="font-serif text-xl">{template.name}</p>
+                {exportError ? <p className="mt-1 text-sm text-red-300">{exportError}</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -190,6 +216,7 @@ export function PreviewPanel({
           Download PDF
         </Button>
       </div>
+      {exportError ? <p className="text-sm text-red-700">{exportError}</p> : null}
       {modal}
     </div>
   );

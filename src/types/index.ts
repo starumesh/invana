@@ -28,8 +28,10 @@ export type CardTypeId =
   | "custom-card";
 
 export type DateValue = {
-  day: number;
-  month: number;
+  /** Day of month (1–31). May be unset until the user fills it. */
+  day?: number | null;
+  /** Month (1–12). May be unset until the user fills it. */
+  month?: number | null;
   year: number;
 };
 
@@ -186,6 +188,12 @@ export type StoredEvent = {
   config: RenderInput;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Whether this event appears on My events.
+   * `false` = working draft from createDraft that has never been explicitly Saved.
+   * Omitted / `true` = listed (legacy events and anything persisted via Save/Publish).
+   */
+  listed?: boolean;
 };
 
 export type RsvpResponse = "yes" | "no" | "maybe";

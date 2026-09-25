@@ -10,7 +10,7 @@ import { WhenWhereSection } from "@/components/invitation/WhenWhereSection";
 import { isSectionEnabled } from "@/components/invitation/sectionVisibility";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select, Textarea } from "@/components/ui/Field";
-import { formatDate, formatTime, isDateValue, isTimeValue } from "@/lib/date";
+import { formatDate, formatTimeRange, isDateValue, isTimeValue } from "@/lib/date";
 import { createId } from "@/lib/id";
 import { Composition } from "@/lib/render/Composition";
 import { rsvpSchema } from "@/lib/validation";
@@ -52,13 +52,34 @@ export function InvitePage() {
       return {
         title: "Invitation not found | Invana",
         description: "This invitation may be unpublished, or the link may have changed.",
+        noIndex: true,
       };
     }
     if (!event) return null;
+    const fields = event.config.fields;
     const title = event.title?.trim() || "You're Invited";
+    const bride = fieldText(fields, "brideName");
+    const groom = fieldText(fields, "groomName");
+    const host =
+      fieldText(fields, "hostNames", "hosts", "celebrantName") ||
+      (bride && groom ? `${bride} & ${groom}` : bride || groom);
+    const dateValue = isDateValue(fields.eventDate) ? fields.eventDate : null;
+    const when = dateValue ? formatDate(dateValue, "weekday") : "";
+    const where = [fieldText(fields, "venueName"), fieldText(fields, "city", "venueCity")]
+      .filter(Boolean)
+      .join(", ");
+    const bits = [
+      `You're invited to ${title}.`,
+      host ? `Hosted by ${host}.` : "",
+      when ? `Date: ${when}.` : "",
+      where ? `Venue: ${where}.` : "",
+      "View details and RSVP online with Invana.",
+    ].filter(Boolean);
     return {
       title: `${title} | Invana`,
-      description: `You're invited to ${title}. View details and RSVP online with Invana.`,
+      description: bits.join(" "),
+      keywords:
+        "digital invitation, online invitation, RSVP, WhatsApp invite, event invite, Invana",
       type: "article" as const,
     };
   }, [event, missing]);
@@ -137,8 +158,9 @@ export function InvitePage() {
   const sections = event.config.sections;
   const dateValue = isDateValue(fields.eventDate) ? fields.eventDate : null;
   const timeValue = isTimeValue(fields.eventTime) ? fields.eventTime : null;
+  const endTimeValue = isTimeValue(fields.eventEndTime) ? fields.eventEndTime : null;
   const date = dateValue ? formatDate(dateValue, "weekday") : "";
-  const time = timeValue ? formatTime(timeValue) : "";
+  const time = formatTimeRange(timeValue, endTimeValue);
   const venue = fieldText(fields, "venueName");
   const city = fieldText(fields, "city", "venueCity");
   const state = fieldText(fields, "state", "venueState");

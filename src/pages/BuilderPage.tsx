@@ -1,26 +1,54 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useBlocker, useParams } from "react-router-dom";
 import { DynamicFields } from "@/components/editor/DynamicFields";
 import { PreviewPanel } from "@/components/editor/PreviewPanel";
 import { ThemePicker } from "@/components/editor/ThemePicker";
 import { Button } from "@/components/ui/Button";
 import { PreviewIcon, SaveIcon } from "@/components/ui/Icons";
 import { normalizeCardType } from "@/config/card-types";
-import { loadDraftForBuilder, persistEvent } from "@/lib/drafts";
+import { getEvent, peekLocalDraft, saveEvent } from "@/api/events";
 import { displayTitle } from "@/lib/fields";
-import { cardFields, invitationFields, withTemplatePhotoFields } from "@/templates/fields";
+import { requiredFieldsError } from "@/lib/validation";
+import { fieldSpecsForInput } from "@/templates/fields";
 import { getTemplate } from "@/templates/registry";
 import { usePageMeta } from "@/seo/usePageMeta";
 import { auth } from "@/services";
 import type { StoredEvent, ThemeId } from "@/types";
 
+const UNSAVED_LEAVE_MESSAGE = "You have unsaved changes. Leave without saving?";
+
+function normalizeBuilderEvent(found: StoredEvent): StoredEvent {
+  const cardType = normalizeCardType(found.config.cardType) ?? found.config.cardType;
+  return cardType !== found.config.cardType
+    ? { ...found, config: { ...found.config, cardType } }
+    : found;
+}
+
 export function BuilderPage() {
   const { id = "" } = useParams();
-  const [event, setEvent] = useState<StoredEvent | null>(null);
+  const [event, setEvent] = useState<StoredEvent | null>(() => {
+    const local = id ? peekLocalDraft(id) : null;
+    return local ? normalizeBuilderEvent(local) : null;
+  });
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  /** True after field/theme edits since last successful save (or page load). */
+  const [dirty, setDirty] = useState(false);
+
+  const blocker = useBlocker(dirty);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = UNSAVED_LEAVE_MESSAGE;
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
 
   const builderMeta = useMemo(() => {
     if (error) {
@@ -44,26 +72,34 @@ export function BuilderPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setEvent(null);
     setError("");
+    setFormError("");
     setSavedAt(null);
     setPreviewOpen(false);
+    setDirty(false);
+
+    // Paint from localStorage synchronously so Use → Builder never flashes “missing”.
+    const local = peekLocalDraft(id);
+    if (local) {
+      setEvent(normalizeBuilderEvent(local));
+    } else {
+      setEvent(null);
+    }
+
     auth.ensureUser();
-    void loadDraftForBuilder(id)
+    void getEvent(id)
       .then((found) => {
         if (cancelled) return;
-        if (!found) setError("This draft could not be found.");
-        else {
-          const cardType = normalizeCardType(found.config.cardType) ?? found.config.cardType;
-          setEvent(
-            cardType !== found.config.cardType
-              ? { ...found, config: { ...found.config, cardType } }
-              : found,
-          );
+        if (!found) {
+          // Only show missing if we still have nothing local (avoid races with in-flight create sync).
+          if (!peekLocalDraft(id)) setError("This draft could not be found.");
+          return;
         }
+        setEvent(normalizeBuilderEvent(found));
       })
       .catch(() => {
-        if (!cancelled) setError("This draft could not be found.");
+        if (cancelled) return;
+        if (!peekLocalDraft(id)) setError("This draft could not be found.");
       });
     return () => {
       cancelled = true;
@@ -74,36 +110,61 @@ export function BuilderPage() {
 
   const fieldSpecs = useMemo(() => {
     if (!event || !template) return [];
-    if (template.kind === "card" && event.config.cardType) return cardFields(event.config.cardType);
-    if (event.config.eventType) {
-      return withTemplatePhotoFields(invitationFields(event.config.eventType), template);
-    }
-    return withTemplatePhotoFields(template.fields, template);
+    return fieldSpecsForInput(event.config, template);
   }, [event, template]);
 
-  const save = useCallback(async (next: StoredEvent) => {
-    setSaving(true);
-    try {
-      const stored = await persistEvent({
-        ...next,
-        title: displayTitle(next.config),
-        updatedAt: new Date().toISOString(),
-      });
-      setEvent(stored);
-      setSavedAt(new Date().toLocaleTimeString());
-      return stored;
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const validateRequired = useCallback(
+    (next: StoredEvent): string | null => {
+      if (!template) return "Template missing.";
+      const specs = fieldSpecsForInput(next.config, template);
+      return requiredFieldsError(specs, next.config.fields);
+    },
+    [template],
+  );
+
+  const save = useCallback(
+    async (next: StoredEvent) => {
+      const missing = validateRequired(next);
+      if (missing) {
+        setFormError(missing);
+        return null;
+      }
+      setFormError("");
+      setSaving(true);
+      try {
+        const stored = await saveEvent({
+          ...next,
+          title: displayTitle(next.config),
+          updatedAt: new Date().toISOString(),
+        });
+        setEvent(stored);
+        setDirty(false);
+        setSavedAt(new Date().toLocaleTimeString());
+        return stored;
+      } catch (e) {
+        setFormError(e instanceof Error ? e.message : "Could not save. Please try again.");
+        return null;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [validateRequired],
+  );
 
   const ensureSaved = useCallback(async () => {
     if (!event) return;
-    await save(event);
-  }, [event, save]);
+    const missing = validateRequired(event);
+    if (missing) {
+      setFormError(missing);
+      throw new Error(missing);
+    }
+    const stored = await save(event);
+    if (!stored) throw new Error("Could not save. Please check required details.");
+  }, [event, save, validateRequired]);
 
   function patchField(key: string, value: unknown) {
     if (!event) return;
+    setFormError("");
     const next: StoredEvent = {
       ...event,
       config: {
@@ -112,11 +173,13 @@ export function BuilderPage() {
       },
     };
     setEvent(next);
+    setDirty(true);
   }
 
   function patchTheme(theme: ThemeId) {
     if (!event) return;
     setEvent({ ...event, config: { ...event.config, theme } });
+    setDirty(true);
   }
 
   if (error) {
@@ -145,9 +208,41 @@ export function BuilderPage() {
 
   const title = displayTitle(event.config);
   const filename = title.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "invitation";
+  const leavePrompt =
+    blocker.state === "blocked" ? (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 backdrop-blur-sm"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="unsaved-leave-title"
+        onClick={() => blocker.reset?.()}
+      >
+        <div
+          className="w-full max-w-md rounded-2xl border border-stone-200 bg-cream p-6 shadow-lift"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-xs uppercase tracking-[0.16em] text-gold-dark">Unsaved changes</p>
+          <h2 id="unsaved-leave-title" className="mt-2 font-serif text-2xl text-ink">
+            Leave without saving?
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+            You have edits that haven’t been saved. If you leave now, those changes will be lost.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={() => blocker.reset?.()}>
+              Keep editing
+            </Button>
+            <Button type="button" size="sm" variant="primary" onClick={() => blocker.proceed?.()}>
+              Leave without saving
+            </Button>
+          </div>
+        </div>
+      </div>
+    ) : null;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 pb-28 md:pb-12">
+      {leavePrompt}
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-gold-dark">
@@ -168,6 +263,12 @@ export function BuilderPage() {
         </div>
       </div>
 
+      {formError ? (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {formError}
+        </div>
+      ) : null}
+
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)]">
         <div className="order-2 space-y-8 lg:order-1">
           <ThemePicker value={event.config.theme} onChange={patchTheme} />
@@ -175,6 +276,7 @@ export function BuilderPage() {
             fields={fieldSpecs}
             values={event.config.fields}
             eventType={event.config.eventType}
+            eventId={event.id}
             onChange={patchField}
           />
           <p className="rounded-2xl border border-dashed border-stone-200 bg-white/60 px-4 py-3 text-sm text-ink-muted">
@@ -205,6 +307,11 @@ export function BuilderPage() {
             maximized={previewOpen}
             onMaximizedChange={setPreviewOpen}
             ensureSaved={ensureSaved}
+            validateBeforeDownload={() => {
+              const missing = validateRequired(event);
+              if (missing) setFormError(missing);
+              return missing;
+            }}
           />
         </div>
       </div>

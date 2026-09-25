@@ -102,6 +102,9 @@ function toRsvp(row: RsvpRow): Rsvp {
 
 async function requireAuthedUserId(): Promise<string> {
   const sb = requireSupabase();
+  // Prefer local session (no Auth network round-trip). RLS still enforces the JWT.
+  const { data: sessionData } = await sb.auth.getSession();
+  if (sessionData.session?.user?.id) return sessionData.session.user.id;
   const { data, error } = await sb.auth.getUser();
   if (error || !data.user) {
     throw new Error("Sign in required to sync this event to the cloud.");
@@ -181,6 +184,26 @@ export const supabasePersistence: PersistenceProvider = {
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return (data as RsvpRow[]).map(toRsvp);
+  },
+
+  async listRsvpsForEventIds(eventIds) {
+    if (!eventIds.length) return [];
+    const sb = requireSupabase();
+    const unique = [...new Set(eventIds)];
+    // Chunk to stay under typical PostgREST URL / `.in` limits.
+    const chunkSize = 80;
+    const rows: RsvpRow[] = [];
+    for (let i = 0; i < unique.length; i += chunkSize) {
+      const chunk = unique.slice(i, i + chunkSize);
+      const { data, error } = await sb
+        .from("rsvps")
+        .select("*")
+        .in("event_id", chunk)
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      rows.push(...((data as RsvpRow[]) ?? []));
+    }
+    return rows.map(toRsvp);
   },
 
   async addRsvp(rsvp) {

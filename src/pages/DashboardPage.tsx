@@ -11,11 +11,8 @@ import { PublishPanel } from "@/components/editor/PublishPanel";
 import { SharePanel } from "@/components/editor/SharePanel";
 import { Button } from "@/components/ui/Button";
 import { DeleteIcon } from "@/components/ui/Icons";
-import { displayTitle } from "@/lib/fields";
-import { persistEvent } from "@/lib/drafts";
+import { deleteEvent, listMyEvents, listRsvpsForEvents, publishEvent } from "@/api/events";
 import { inviteUrl } from "@/lib/url";
-import { activePersistence, auth } from "@/services";
-import { demoAuth, demoPersistence } from "@/services/demo";
 import type { Rsvp, RsvpResponse, StoredEvent } from "@/types";
 
 type Row = StoredEvent & { rsvps: Rsvp[] };
@@ -46,53 +43,45 @@ export function DashboardPage() {
     setRsvpDetailsOpen((prev) => ({ ...prev, [eventId]: true }));
   }
 
-  async function reload() {
-    const store = activePersistence();
-    const userId =
-      isDemoMode || signedIn ? auth.ensureUser().id : demoAuth.ensureUser().id;
-    const byId = new Map<string, StoredEvent>();
-
-    // Include local mirrors so drafts created offline still show after sign-in.
-    for (const event of await demoPersistence.listEvents(demoAuth.ensureUser().id)) {
-      byId.set(event.id, event);
-    }
-    if (signedIn || isDemoMode) {
-      for (const event of await store.listEvents(userId)) {
-        byId.set(event.id, event);
-      }
-      if (!isDemoMode) {
-        for (const event of await demoPersistence.listEvents(userId)) {
-          const existing = byId.get(event.id);
-          if (!existing || event.updatedAt > existing.updatedAt) byId.set(event.id, event);
-        }
-      }
-    }
-
-    const events = [...byId.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    const withRsvp = await Promise.all(
-      events.map(async (event) => ({
-        ...event,
-        rsvps: await store.listRsvps(event.id).catch(async () => demoPersistence.listRsvps(event.id)),
-      })),
-    );
-    setRows(withRsvp);
-  }
-
   useEffect(() => {
     if (!ready) return;
+    let cancelled = false;
     void (async () => {
       setLoading(true);
       setError(null);
       try {
-        await reload();
+        const events = (await listMyEvents()).sort((a, b) =>
+          b.updatedAt.localeCompare(a.updatedAt),
+        );
+        if (cancelled) return;
+        setRows(events.map((event) => ({ ...event, rsvps: [] })));
+        setLoading(false);
+
+        if (!events.length) return;
+
+        try {
+          const rsvpMap = await listRsvpsForEvents(events.map((event) => event.id));
+          if (cancelled) return;
+          setRows(
+            events.map((event) => ({
+              ...event,
+              rsvps: rsvpMap.get(event.id) ?? [],
+            })),
+          );
+        } catch {
+          /* list already visible */
+        }
       } catch (e) {
+        if (cancelled) return;
         setError(e instanceof Error ? e.message : "Failed to load events.");
         setRows([]);
-      } finally {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload closes over latest signedIn
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- signedIn/isDemoMode gate reload
   }, [ready, isDemoMode, signedIn]);
 
   function requestRemove(row: Row) {
@@ -106,11 +95,10 @@ export function DashboardPage() {
   async function remove(id: string) {
     setPendingDelete(null);
     try {
-      await activePersistence().deleteEvent(id);
+      await deleteEvent(id);
     } catch {
-      /* may only exist locally */
+      /* UI already optimistic below */
     }
-    await demoPersistence.deleteEvent(id);
     setRows((prev) => prev.filter((row) => row.id !== id));
     if (activeId === id) {
       setActiveId(null);
@@ -125,20 +113,14 @@ export function DashboardPage() {
       return;
     }
     if (next === "publish" || next === "share") {
-      if (!allowSignedInAction()) return;
+      if (!allowSignedInAction({ mode: "account" })) return;
     }
     setActiveId(id);
     setPanel(next);
   }
 
   async function onPublish(event: StoredEvent, slug: string) {
-    const stored = await persistEvent({
-      ...event,
-      slug,
-      status: "published",
-      title: displayTitle(event.config),
-      updatedAt: new Date().toISOString(),
-    });
+    const stored = await publishEvent(event, slug);
     setRows((prev) =>
       prev.map((row) => (row.id === stored.id ? { ...row, ...stored } : row)),
     );

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { TemplateThumb } from "@/components/templates/TemplateThumb";
+import { TemplateCard } from "@/components/templates/TemplateCard";
 import { Select } from "@/components/ui/Field";
 import { EVENT_TYPES } from "@/config/event-types";
 import { CARD_TYPES } from "@/config/card-types";
@@ -31,7 +30,7 @@ export function TemplatesPage() {
       <div className="max-w-2xl animate-fade-up">
         <p className="text-xs uppercase tracking-[0.18em] text-gold-dark">Gallery</p>
         <h1 className="mt-2 font-serif text-4xl md:text-5xl">Template gallery</h1>
-        <p className="mt-3 text-ink-muted">Browse by look — invitations and cards, ready to personalize.</p>
+        <p className="mt-3 text-ink-muted">Browse by look — tap Use on any card to start personalizing.</p>
       </div>
 
       <div className="mt-8 flex flex-wrap gap-2">
@@ -102,12 +101,23 @@ export function TemplatesPage() {
               ? `/create/card?template=${template.id}&card=${template.cardTypes?.[0] ?? CARD_TYPES[0].id}`
               : `/create/${template.eventTypes[0]}?template=${template.id}`;
           return (
-            <Link
+            <TemplateCard
               key={template.id}
-              to={href}
-              className="group block animate-fade-up"
+              template={template}
+              eventType={template.eventTypes[0]}
+              cardType={template.cardTypes?.[0]}
+              href={href}
+              ctaLabel="Use"
+              className="animate-fade-up"
               style={{ animationDelay: `${Math.min(index, 9) * 35}ms` }}
-              onClick={() =>
+              meta={
+                template.kind === "card"
+                  ? template.cardTypes?.includes("bio")
+                    ? "Bio Data"
+                    : "Card"
+                  : template.eventTypes.slice(0, 2).join(" · ")
+              }
+              onNavigate={() =>
                 trackTemplateClick({
                   templateId: template.id,
                   templateName: template.name,
@@ -117,24 +127,7 @@ export function TemplatesPage() {
                   cardType: template.kind === "card" ? template.cardTypes?.[0] : undefined,
                 })
               }
-            >
-              <TemplateThumb
-                template={template}
-                eventType={template.eventTypes[0]}
-                cardType={template.cardTypes?.[0]}
-                className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-card transition duration-300 group-hover:-translate-y-1 group-hover:shadow-lift"
-              />
-              <div className="mt-3">
-                <p className="font-medium group-hover:text-gold-dark">{template.name}</p>
-                <p className="mt-1 text-sm text-ink-muted">
-                  {template.kind === "card"
-                    ? template.cardTypes?.includes("bio")
-                      ? "Bio Data"
-                      : "Card"
-                    : template.eventTypes.slice(0, 2).join(" · ")}
-                </p>
-              </div>
-            </Link>
+            />
           );
         })}
       </div>

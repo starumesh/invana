@@ -1,4 +1,4 @@
-import type { CardTypeId, ElementSpec, EventTypeId, FieldSpec, TemplateDefinition } from "@/types";
+import type { CardTypeId, ElementSpec, EventTypeId, FieldSpec, RenderInput, TemplateDefinition } from "@/types";
 
 const coreVenue: FieldSpec[] = [
   { key: "venueName", label: "Venue name", type: "text", required: true, group: "Venue", placeholder: "The Leela Palace" },
@@ -14,7 +14,8 @@ const optionalVenue: FieldSpec[] = [
 
 const scheduleFields: FieldSpec[] = [
   { key: "eventDate", label: "Date", type: "date", required: true, group: "When" },
-  { key: "eventTime", label: "Time", type: "time", required: true, group: "When" },
+  { key: "eventTime", label: "Start time", type: "time", group: "When" },
+  { key: "eventEndTime", label: "End time", type: "time", group: "When" },
 ];
 
 const optionalSchedule: FieldSpec[] = [
@@ -301,4 +302,11 @@ export function cardFields(kind: CardTypeId): FieldSpec[] {
     { key: "email", label: "Email", type: "email", group: "Contact" },
     { key: "profileUrl", label: "QR URL", type: "url", group: "Contact" },
   ];
+}
+
+/** Field specs for an event/card config — same set the builder form uses. */
+export function fieldSpecsForInput(input: RenderInput, template: TemplateDefinition): FieldSpec[] {
+  if (template.kind === "card" && input.cardType) return cardFields(input.cardType);
+  if (input.eventType) return withTemplatePhotoFields(invitationFields(input.eventType), template);
+  return withTemplatePhotoFields(template.fields, template);
 }

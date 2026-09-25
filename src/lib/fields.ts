@@ -1,4 +1,4 @@
-import { formatDate, formatTime, isDateValue, isTimeValue } from "@/lib/date";
+import { formatDate, formatTimeRange, isDateValue, isTimeValue } from "@/lib/date";
 import { themeOverlay } from "@/config/themes";
 import { messagesFor } from "@/config/welcome-messages";
 import { isBioCardType } from "@/config/card-types";
@@ -27,7 +27,7 @@ function stringFields(fields: Record<string, unknown>): Record<string, string> {
   return out;
 }
 
-export function resolveFields(template: TemplateDefinition, input: RenderInput, guestName?: string): Record<string, string> {
+export function resolveFields(_template: TemplateDefinition, input: RenderInput, guestName?: string): Record<string, string> {
   const fields = input.fields ?? {};
   const bride = text(fields, "brideName");
   const groom = text(fields, "groomName");
@@ -50,20 +50,20 @@ export function resolveFields(template: TemplateDefinition, input: RenderInput, 
     input.eventType === "reception";
 
   const primary = isCouple
-    ? bride || celebrant || family || host || name || "Priya"
-    : celebrant || family || host || name || bride || (template.kind === "invitation" ? "Priya" : "Your Name");
+    ? bride || celebrant || family || host || name || ""
+    : celebrant || family || host || name || bride || "";
   const secondary = isCouple ? groom || "" : groom;
   const date = isDateValue(fields.eventDate) ? formatDate(fields.eventDate, "weekday") : "";
-  const time = isTimeValue(fields.eventTime) ? formatTime(fields.eventTime) : "";
+  const time = formatTimeRange(
+    isTimeValue(fields.eventTime) ? fields.eventTime : null,
+    isTimeValue(fields.eventEndTime) ? fields.eventEndTime : null,
+  );
   const city = [text(fields, "city"), text(fields, "state")].filter(Boolean).join(", ");
   const address = text(fields, "venueAddress");
   const maps = text(fields, "locationUrl");
   const profileUrl = text(fields, "profileUrl") || text(fields, "website") || text(fields, "linkedin");
   const qrUrl = maps || profileUrl || "";
-  const message =
-    text(fields, "invitationMessage") ||
-    messagesFor(input.eventType)[0] ||
-    "You are cordially invited.";
+  const message = text(fields, "invitationMessage") || "";
 
   const facts = [
     text(fields, "age") && `Age ${text(fields, "age")}`,
@@ -348,6 +348,14 @@ export function defaultFields(template: TemplateDefinition, input: Partial<Rende
     return { ...base, brideName: "Priya", groomName: "Rahul" };
   }
   return { ...base, hostNames: "The Kapoor Family", eventTitle: "Celebration" };
+}
+
+/** Empty starting fields for a new draft — only the current year is prefilled for invitations. */
+export function blankFields(template: TemplateDefinition, _input: Partial<RenderInput> = {}): Record<string, unknown> {
+  if (template.kind === "card") return {};
+  return {
+    eventDate: { year: new Date().getFullYear() },
+  };
 }
 
 export function displayTitle(input: RenderInput): string {

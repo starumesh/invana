@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from "react-router-dom";
 import { App } from "@/App";
 import { AuthSessionProvider } from "@/auth/AuthSession";
 import { initAnalytics } from "@/lib/analytics";
@@ -19,12 +19,13 @@ function migrateHashRoute() {
 migrateHashRoute();
 initAnalytics();
 
+/** Data router so BuilderPage can use `useBlocker` for unsaved-change prompts. */
+const router = createBrowserRouter(createRoutesFromElements(<Route path="*" element={<App />} />));
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthSessionProvider>
-        <App />
-      </AuthSessionProvider>
-    </BrowserRouter>
+    <AuthSessionProvider>
+      <RouterProvider router={router} />
+    </AuthSessionProvider>
   </StrictMode>,
 );

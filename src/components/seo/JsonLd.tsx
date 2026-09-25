@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import { SITE_NAME, DEFAULT_META } from "@/seo/pageMeta";
-import { publicOrigin } from "@/lib/url";
+import { SITE_NAME, DEFAULT_META, DEFAULT_KEYWORDS } from "@/seo/pageMeta";
+import { CANONICAL_SITE_URL, publicOrigin } from "@/lib/url";
 
 /** JSON-LD so Google understands Invana for invitation + bio data queries. */
 export function JsonLd() {
   useEffect(() => {
-    const origin = publicOrigin() || "https://invana.vercel.app";
+    const origin = publicOrigin() || CANONICAL_SITE_URL;
     const data = {
       "@context": "https://schema.org",
       "@graph": [
@@ -15,6 +15,17 @@ export function JsonLd() {
           name: SITE_NAME,
           url: `${origin}/`,
           description: DEFAULT_META.description,
+          publisher: { "@id": `${origin}/#organization` },
+          inLanguage: "en",
+        },
+        {
+          "@type": "Organization",
+          "@id": `${origin}/#organization`,
+          name: SITE_NAME,
+          url: `${origin}/`,
+          description:
+            "Free online maker for digital invitations and marriage bio data cards.",
+          logo: `${origin}/og-default.svg`,
         },
         {
           "@type": "SoftwareApplication",
@@ -23,6 +34,7 @@ export function JsonLd() {
           operatingSystem: "Web",
           url: `${origin}/`,
           description: DEFAULT_META.description,
+          keywords: DEFAULT_KEYWORDS,
           offers: {
             "@type": "Offer",
             price: "0",
@@ -35,13 +47,7 @@ export function JsonLd() {
             "RSVP pages",
             "WhatsApp invite sharing",
           ],
-        },
-        {
-          "@type": "Organization",
-          name: SITE_NAME,
-          url: `${origin}/`,
-          description:
-            "Free online maker for digital invitations and marriage bio data cards.",
+          publisher: { "@id": `${origin}/#organization` },
         },
       ],
     };

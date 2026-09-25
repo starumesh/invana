@@ -1,32 +1,38 @@
 # Deployment
 
-## GitHub Pages (existing)
+## Netlify (production — https://invana.stream)
 
-Workflow: `.github/workflows/deploy-pages.yml`  
-Uses `HashRouter` + `base: './'`. Deep links: `/#/invite/<slug>`.
+Config: `netlify.toml` and `public/_redirects` — SPA fallback `/* → /index.html` (200) for BrowserRouter deep links.
+
+```bash
+npm run build
+# connect the repo in Netlify, or drag dist/
+```
+
+Set env in the Netlify project (also defaulted in `netlify.toml`):
+
+- `VITE_PUBLIC_SITE_URL=https://invana.stream`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- optional `VITE_MESSAGING_MODE`, `VITE_GA_MEASUREMENT_ID`
+
+After deploy, submit `https://invana.stream/sitemap.xml` in Google Search Console for the `invana.stream` property.
 
 ## Vercel (dedicated host)
 
-Config: `vercel.json` — SPA rewrite so path-style routes resolve if you later switch to `BrowserRouter`.
+Config: `vercel.json` — SPA rewrite for path-style routes.
 
 ```bash
 npm i -g vercel
 vercel
 ```
 
-Set env in the Vercel project: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_PUBLIC_SITE_URL`, optional `VITE_MESSAGING_MODE`.
+Set env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_PUBLIC_SITE_URL`, optional `VITE_MESSAGING_MODE`.
 
-**Deep links today:** with `HashRouter`, refresh works without rewrites (`https://your.app/#/invite/slug`).  
-**If you switch to `BrowserRouter`:** keep the `vercel.json` rewrite so `/invite/:slug` serves `index.html`.
+## GitHub Pages (legacy)
 
-## Netlify (dedicated host)
-
-Config: `netlify.toml` — same SPA fallback via `[[redirects]]`.
-
-```bash
-npm run build
-# drag dist/ in Netlify UI, or connect the repo
-```
+Workflow: `.github/workflows/deploy-pages.yml`  
+Historically used hash routes (`/#/invite/<slug>`). Prefer Netlify + BrowserRouter for crawlable path URLs.
 
 ## Cloudflare Pages
 
@@ -37,8 +43,8 @@ Add a `_redirects` file (or Dashboard SPA fallback) equivalent to `/* /index.htm
 
 | Host | Config file | Purpose |
 |------|-------------|---------|
-| GitHub Pages | workflow copies `404.html` | Path fallback for project pages |
+| Netlify | `netlify.toml` + `public/_redirects` | Path deep links (production) |
 | Vercel | `vercel.json` rewrites | Path deep links |
-| Netlify | `netlify.toml` redirects | Path deep links |
+| GitHub Pages | workflow copies `404.html` | Path fallback for project pages |
 
-Prefer setting `VITE_PUBLIC_SITE_URL` to the canonical HTTPS origin (custom domain) so share links and QR codes are absolute.
+Prefer setting `VITE_PUBLIC_SITE_URL` to `https://invana.stream` so share links, QR codes, OG, and canonical URLs stay absolute and consistent.
