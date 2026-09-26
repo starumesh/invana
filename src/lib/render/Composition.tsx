@@ -243,29 +243,17 @@ function ElementNode({
   return null;
 }
 
-/** object-fit: cover — scale image to fill frame, center, crop overflow (no stretch / letterbox). */
-function coverCropRect(
-  frameX: number,
-  frameY: number,
-  frameW: number,
-  frameH: number,
-  naturalW: number,
-  naturalH: number,
-): { x: number; y: number; width: number; height: number } {
-  if (naturalW <= 0 || naturalH <= 0 || frameW <= 0 || frameH <= 0) {
-    return { x: frameX, y: frameY, width: frameW, height: frameH };
-  }
-  const scale = Math.max(frameW / naturalW, frameH / naturalH);
-  const width = naturalW * scale;
-  const height = naturalH * scale;
-  return {
-    x: frameX + (frameW - width) / 2,
-    y: frameY + (frameH - height) / 2,
-    width,
-    height,
-  };
-}
-
+/**
+ * Cover-crop a photo into the template slot (CSS object-fit: cover).
+ *
+ * Always use frame-sized <image preserveAspectRatio="xMidYMid slice"> + clipPath.
+ * Do NOT size from HTML Image naturalWidth with preserveAspectRatio="none":
+ * browsers often report EXIF-oriented dimensions while SVG draws the raw bitmap,
+ * which stretches or letterboxes phone photos in the slot.
+ *
+ * New uploads go through prepareImageForUpload (orientation baked into pixels),
+ * so slice + clip fills correctly in builder, invite, and PNG/PDF export.
+ */
 function CoverCropImage({
   href,
   x,
@@ -283,34 +271,6 @@ function CoverCropImage({
   rx: number;
   clipId: string;
 }) {
-  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const img = new Image();
-    // Allow canvas/export pipelines to read Storage URLs when CORS is configured.
-    if (/^https?:/i.test(href)) {
-      img.crossOrigin = "anonymous";
-    }
-    img.onload = () => {
-      if (!active) return;
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
-      if (w > 0 && h > 0) setNatural({ w, h });
-    };
-    img.onerror = () => {
-      if (active) setNatural(null);
-    };
-    img.src = href;
-    return () => {
-      active = false;
-    };
-  }, [href]);
-
-  // Until natural size is known, fall back to SVG slice (cover). Once known, size
-  // explicitly so clip + export rasterize stay consistent across browsers.
-  const placed = natural ? coverCropRect(x, y, width, height, natural.w, natural.h) : null;
-
   return (
     <g>
       <defs>
@@ -319,29 +279,17 @@ function CoverCropImage({
         </clipPath>
       </defs>
       <g clipPath={`url(#${clipId})`}>
-        {placed ? (
-          <image
-            href={href}
-            xlinkHref={href}
-            x={placed.x}
-            y={placed.y}
-            width={placed.width}
-            height={placed.height}
-            preserveAspectRatio="none"
-            data-cover-crop="true"
-          />
-        ) : (
-          <image
-            href={href}
-            xlinkHref={href}
-            x={x}
-            y={y}
-            width={width}
-            height={height}
-            preserveAspectRatio="xMidYMid slice"
-            data-cover-crop="true"
-          />
-        )}
+        <image
+          href={href}
+          xlinkHref={href}
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          preserveAspectRatio="xMidYMid slice"
+          data-cover-crop="true"
+          data-cover-frame={`${x},${y},${width},${height}`}
+        />
       </g>
     </g>
   );

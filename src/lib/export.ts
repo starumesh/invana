@@ -91,8 +91,23 @@ async function prepareSvgClone(svg: SVGSVGElement): Promise<SVGSVGElement> {
     const image = node as SVGImageElement;
     const href = readImageHref(image);
     if (href) writeImageHref(image, href);
-    // Ensure cover-crop survives rasterize even if natural-size layout wasn't ready.
-    if (!image.getAttribute("preserveAspectRatio")) {
+
+    // Normalize cover-crop slots to frame + slice so PNG/PDF match live preview
+    // (avoids stale preserveAspectRatio="none" + oversized geometry from older layouts).
+    if (image.getAttribute("data-cover-crop") === "true") {
+      const frame = image.getAttribute("data-cover-frame");
+      if (frame) {
+        const parts = frame.split(",").map(Number);
+        if (parts.length === 4 && parts.every((n) => Number.isFinite(n))) {
+          const [fx, fy, fw, fh] = parts;
+          image.setAttribute("x", String(fx));
+          image.setAttribute("y", String(fy));
+          image.setAttribute("width", String(fw));
+          image.setAttribute("height", String(fh));
+        }
+      }
+      image.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    } else if (!image.getAttribute("preserveAspectRatio")) {
       image.setAttribute("preserveAspectRatio", "xMidYMid slice");
     }
   });

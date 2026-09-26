@@ -166,7 +166,7 @@ flowchart LR
 
 - Bucket: **public-read** `event-media` (Phase 1 default).  
 - Path: `{userId}/{eventId}/{id}.ext`.  
-- Writes: owner-only; MIME/size validation at Media Edge (10 MB; jpeg/png/webp/gif).  
+- Writes: owner-only; MIME/size validation at Media Edge (2 MB; jpeg/png/webp/gif). Client compresses/resizes before upload (`prepareImageForUpload`).  
 - `event_media` is metadata SoR; binaries never in Postgres.  
 - **Invariant:** after save-for-publish, every image field in `config` is a durable HTTPS URL. Invite and export both use it. Export inlines images as data URLs at rasterize time so Storage CORS does not drop photos from PNG/PDF.
 

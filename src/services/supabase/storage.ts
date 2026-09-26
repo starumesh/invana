@@ -1,4 +1,5 @@
 import { createId } from "@/lib/id";
+import { MAX_UPLOAD_BYTES } from "@/lib/imageOptimize";
 import { requireSupabase } from "@/lib/supabase/client";
 import { uploadImageViaEdge } from "@/services/api/mediaApi";
 import { EdgeApiError } from "@/services/api/edgeClient";
@@ -13,6 +14,10 @@ const BUCKET = "event-media";
  */
 export const supabaseStorage: StorageProvider = {
   async uploadImage(opts) {
+    if (opts.file.size > MAX_UPLOAD_BYTES) {
+      throw new Error("Image must be 2 MB or smaller. Compress or resize the photo and try again.");
+    }
+
     try {
       const viaEdge = await uploadImageViaEdge(opts);
       if (viaEdge) return viaEdge;

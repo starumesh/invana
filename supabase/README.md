@@ -25,7 +25,7 @@ Required for signed-in photo uploads. Public-read (invite guests + export CORS).
 **Dashboard**
 
 1. **Storage → New bucket** → name `event-media`, **Public: ON**  
-2. File size limit: `10485760` (10 MB)  
+2. File size limit: `2097152` (2 MB)  
 3. Allowed MIME: `image/jpeg`, `image/png`, `image/webp`, `image/gif`  
 4. Policies (or run the storage migration):
    - **SELECT** — public (`bucket_id = 'event-media'`)  

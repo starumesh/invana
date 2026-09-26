@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { messagesFor } from "@/config/welcome-messages";
 import { Input, Label, Select, Textarea } from "@/components/ui/Field";
+import { ImageOptimizeError, prepareImageForUpload } from "@/lib/imageOptimize";
 import { resolveActiveStorage } from "@/services";
 import type { DateValue, EventTypeId, FieldSpec, TimeValue } from "@/types";
 
@@ -14,7 +15,8 @@ type Props = {
 
 const OPTIONAL_GROUP = "More details";
 const PHOTO_GROUPS = new Set(["Photo", "Photos"]);
-const COVER_CROP_HINT = "Portrait or landscape — we’ll cover-crop to the frame.";
+const COVER_CROP_HINT =
+  "Portrait or landscape — we’ll cover-crop to the frame. Max 2 MB (we compress before upload).";
 
 export function DynamicFields({ fields, values, eventType, eventId, onChange }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -426,11 +428,18 @@ function ImageField({
     setUploading(true);
     setUploadError("");
     try {
+      const prepared = await prepareImageForUpload(file);
       const storage = await resolveActiveStorage();
-      const uploaded = await storage.uploadImage({ file, eventId });
+      const uploaded = await storage.uploadImage({ file: prepared, eventId });
       onChange(uploaded.url);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+      const message =
+        err instanceof ImageOptimizeError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Upload failed.";
+      setUploadError(message);
     } finally {
       setUploading(false);
     }

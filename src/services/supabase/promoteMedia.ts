@@ -1,3 +1,4 @@
+import { prepareImageForUpload } from "@/lib/imageOptimize";
 import { isBrowserLocalMediaUrl, urlToImageFile } from "@/lib/mediaUrl";
 import { supabaseStorage } from "@/services/supabase/storage";
 import type { StoredEvent } from "@/types";
@@ -21,7 +22,8 @@ export async function promoteLocalMediaInEvent(event: StoredEvent): Promise<Stor
   await Promise.all(
     localKeys.map(async ([key, url]) => {
       const file = await urlToImageFile(url, key);
-      const uploaded = await supabaseStorage.uploadImage({ file, eventId: event.id });
+      const prepared = await prepareImageForUpload(file);
+      const uploaded = await supabaseStorage.uploadImage({ file: prepared, eventId: event.id });
       nextFields[key] = uploaded.url;
       if (url.startsWith("blob:")) {
         try {

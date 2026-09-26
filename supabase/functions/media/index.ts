@@ -9,7 +9,7 @@ import { json, readJson, requestId } from "../_shared/http.ts";
 import { anonClient, requireUserId, serviceClient } from "../_shared/supabase.ts";
 
 const BUCKET = "event-media";
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 type UploadBody = {
@@ -61,9 +61,11 @@ serve(async (req) => {
     }
 
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) {
-      return json({ error: `Image must be between 1 byte and ${MAX_BYTES} bytes.` }, 400, {
-        requestId: rid,
-      });
+      return json(
+        { error: "Image must be 2 MB or smaller. Compress or resize the photo and try again." },
+        400,
+        { requestId: rid },
+      );
     }
 
     const eventIdRaw = (body.eventId || "shared").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "shared";
