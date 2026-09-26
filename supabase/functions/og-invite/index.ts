@@ -70,7 +70,7 @@ serve(async (req) => {
     }
 
     const site = (Deno.env.get("PUBLIC_SITE_URL") || "https://invana.stream").replace(/\/$/, "");
-    const spaUrl = `${site}/#/invite/${encodeURIComponent(key)}`;
+    const spaUrl = `${site}/invite/${encodeURIComponent(key)}`;
 
     const sb = anonClient();
     const { data: exactRow } = await sb

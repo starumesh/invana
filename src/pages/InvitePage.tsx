@@ -277,7 +277,7 @@ export function InvitePage() {
               </dl>
             </section>
 
-            {/* HashRouter treats href="#…" as a route change — scroll via ref instead. */}
+            {/* Prefer scroll via ref — hash hrefs can fight BrowserRouter navigation. */}
             <button
               type="button"
               onClick={scrollToDetails}

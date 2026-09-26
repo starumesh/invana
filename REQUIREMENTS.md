@@ -504,26 +504,34 @@ Separate template definition, user event data, and generated files; the renderer
 
 ## 20. Code architecture
 
+Current layout (see also [docs/architecture.md](docs/architecture.md)):
+
 ```
 src/
-  components/{ui, editor, invitation, cards, rsvp, media, whatsapp}/
-  features/{events, templates, exports, rsvp, messaging, profiles}/
-  pages/  layouts/
-  lib/{supabase, qr, export, validation, render}/
-  templates/{wedding, engagement, birthday, gruhapravesham, sangeet, haldi, cards}/
-  services/{events, templates, exports, messaging, storage}/
-  providers/{whatsapp, future}/
-  integrations/canva/
-  i18n/messages/
-  types/  hooks/  utils/  config/
+  api/                         # events facade (create/save/publish/claim)
+  auth/                        # session + sign-in gates
+  components/{ui, editor, invitation, seo, templates}/
+  config/                      # event types, card types, themes
+  lib/{supabase, qr, export, mediaUrl, durableMedia, validation, render, slug}/
+  pages/
+  seo/
+  services/                    # Persistence/Auth/Messaging/Storage providers
+  services/{demo, demoStorage, supabase}/
+  services/api/                # Edge logical API clients (invite, rsvp, media)
+  templates/                   # registry + factories
+  types/
+supabase/
+  migrations/
+  functions/{invite, rsvp, media, events, og-invite, whatsapp-*}
+  functions/_shared/
 ```
 
 Principles:
 
 - Rendering, data (`RenderInput`), export, distribution, and persistence are independent modules with small interfaces.
-- Adapters in `services/*` and `providers/*` expose Demo and Connected implementations; env selects the mode.
+- Adapters in `services/*` expose Demo and Connected implementations; env selects the mode.
 - Comment the why, not the what.
-- Build seams now (interfaces, registries, JSONB). Do not invent microservices, unused plugin frameworks, or a custom auth server.
+- Build seams now (interfaces, registries, JSONB). Prefer **logical services** on Supabase Edge (Phase 1) over a big-bang microservice split or a custom auth server. Extract deployables only when load or team boundaries demand it (see [docs/architecture.md](docs/architecture.md)).
 
 ---
 
@@ -585,6 +593,9 @@ TypeScript compile, ESLint, formatter, unit, component, E2E, and production buil
 VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 VITE_MESSAGING_MODE=demo|cloud|wa_me
+VITE_PUBLIC_SITE_URL=
+VITE_REQUIRE_SIGN_IN=true
+VITE_GA_MEASUREMENT_ID=
 ```
 
 Backend secrets must not use `VITE_`: WhatsApp tokens/IDs, webhook secrets, service role key (Edge Functions only).
@@ -604,9 +615,13 @@ Backend secrets must not use `VITE_`: WhatsApp tokens/IDs, webhook secrets, serv
 
 ## 26. Documentation
 
-- **README:** overview, architecture, folder structure, local setup, env vars, Supabase setup, WhatsApp Business Cloud API config, dedicated hosting deploy, template-creation guide, adding event/card types, export formats, testing, troubleshooting.
-- **`docs/`:** architecture, template engine, event model, export system, RSVP, WhatsApp integration, deployment, adding a template, testing.
-- Highest-leverage doc: adding a template — write it early so template creation scales.
+- **README:** overview, quick start, product flow, architecture summary, env vars, Connected Mode, hosting, doc index.
+- **`docs/architecture.md`:** full backend/FE architecture (source of truth) — actors, adapters, logical services, APIs, media/RSVP invariants, phases.
+- **`docs/deployment.md`:** Netlify / Vercel / Pages / Cloudflare + Connected checklist.
+- **`docs/whatsapp.md`:** WhatsApp Cloud API Edge setup.
+- **`supabase/README.md`:** migrations, RLS, Storage, Edge deploy & verify.
+- **`REQUIREMENTS.md`:** this product requirements document.
+- Highest-leverage follow-up docs (when scaling templates): adding a template, event model, export system.
 
 ---
 

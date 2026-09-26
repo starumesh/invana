@@ -1,50 +1,82 @@
 # Deployment
 
-## Netlify (production — https://invana.stream)
+Production: **https://invana.stream** (Netlify).  
+App uses **BrowserRouter** path URLs (`/invite/:slug`, `/create`, …). SPA hosts need a fallback rewrite to `index.html`.
 
-Config: `netlify.toml` and `public/_redirects` — SPA fallback `/* → /index.html` (200) for BrowserRouter deep links.
+Architecture overview: [architecture.md](architecture.md) · env vars: [README](../README.md#environment).
+
+---
+
+## Netlify (production)
+
+Config: `netlify.toml` + `public/_redirects` — `/* → /index.html` (200).
 
 ```bash
 npm run build
-# connect the repo in Netlify, or drag dist/
+# connect the repo in Netlify, or publish dist/
 ```
 
-Set env in the Netlify project (also defaulted in `netlify.toml`):
+**Build env** (also documented in `netlify.toml`):
 
-- `VITE_PUBLIC_SITE_URL=https://invana.stream`
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-- optional `VITE_MESSAGING_MODE`, `VITE_GA_MEASUREMENT_ID`
+| Variable | Example |
+|----------|---------|
+| `VITE_PUBLIC_SITE_URL` | `https://invana.stream` |
+| `VITE_SUPABASE_URL` | `https://….supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | publishable / anon key |
+| `VITE_MESSAGING_MODE` | unset / `wa_me` / `cloud` |
+| `VITE_REQUIRE_SIGN_IN` | `true` (default) |
+| `VITE_GA_MEASUREMENT_ID` | optional |
 
-After deploy, submit `https://invana.stream/sitemap.xml` in Google Search Console for the `invana.stream` property.
+After deploy, submit `https://invana.stream/sitemap.xml` in Google Search Console.
 
-## Vercel (dedicated host)
+**Invite OG for bots:** Edge Function `og-invite` returns HTML with `og:*` tags. Wire a CDN/bot rewrite to that function when ready; until then, client-side meta updates after the invite loads.
 
-Config: `vercel.json` — SPA rewrite for path-style routes.
+---
+
+## Vercel
+
+Config: `vercel.json` SPA rewrites.
 
 ```bash
 npm i -g vercel
 vercel
 ```
 
-Set env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_PUBLIC_SITE_URL`, optional `VITE_MESSAGING_MODE`.
+Set the same `VITE_*` vars as Netlify.
 
-## GitHub Pages (legacy)
-
-Workflow: `.github/workflows/deploy-pages.yml`  
-Historically used hash routes (`/#/invite/<slug>`). Prefer Netlify + BrowserRouter for crawlable path URLs.
+---
 
 ## Cloudflare Pages
 
-Build command: `npm run build` · Output: `dist`  
-Add a `_redirects` file (or Dashboard SPA fallback) equivalent to `/* /index.html 200` if using path routing.
+- Build: `npm run build`  
+- Output: `dist`  
+- SPA fallback: `/* /index.html 200` (or Dashboard equivalent)
 
-## SPA notes
+---
 
-| Host | Config file | Purpose |
-|------|-------------|---------|
+## GitHub Pages (legacy)
+
+Workflow: `.github/workflows/deploy-pages.yml`.  
+Prefer Netlify for crawlable path URLs. The app migrates old `/#/path` links to `/path` on load.
+
+---
+
+## Connected Mode checklist (host + Supabase)
+
+1. Apply SQL migrations ([supabase/README.md](../supabase/README.md)).  
+2. Deploy Edge Functions: `invite`, `rsvp`, `media`, `events`, `og-invite` (+ `whatsapp-*` if using Cloud API).  
+3. Set frontend `VITE_*` on the host.  
+4. Set Edge secrets only in Supabase (`WHATSAPP_*`, optional `PUBLIC_SITE_URL`) — never in `VITE_*`.  
+5. Verify: sign in → upload photo → Save → Publish → open `/invite/{slug}` → RSVP from another browser → host dashboard.
+
+---
+
+## SPA config matrix
+
+| Host | Config | Purpose |
+|------|--------|---------|
 | Netlify | `netlify.toml` + `public/_redirects` | Path deep links (production) |
-| Vercel | `vercel.json` rewrites | Path deep links |
-| GitHub Pages | workflow copies `404.html` | Path fallback for project pages |
+| Vercel | `vercel.json` | Path deep links |
+| GitHub Pages | workflow `404.html` | Project-pages fallback |
 
-Prefer setting `VITE_PUBLIC_SITE_URL` to `https://invana.stream` so share links, QR codes, OG, and canonical URLs stay absolute and consistent.
+Always set `VITE_PUBLIC_SITE_URL` to the canonical origin so share links, QR, OG, and magic-link redirects stay absolute.
