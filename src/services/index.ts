@@ -1,4 +1,7 @@
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { fetchPublicInviteBySlug } from "@/services/api/inviteApi";
+import { createPublicRsvpViaEdge } from "@/services/api/rsvpApi";
+import { EdgeApiError } from "@/services/api/edgeClient";
 import { demoAuth, demoMessaging, demoPersistence } from "@/services/demo";
 import { demoStorage } from "@/services/demoStorage";
 import { supabaseAuth } from "@/services/supabase/auth";
@@ -78,19 +81,28 @@ export async function resolveActiveStorage(): Promise<StorageProvider> {
 }
 
 /**
- * Public invite lookup: prefer a published copy from either store.
- * Important: do not return a local draft when Supabase has the published event
- * (that previously caused "Invitation not found" after Publish).
+ * Public invite lookup: prefer Edge Invite Read API (Phase 1), then PostgREST,
+ * then local published mirror. Never prefer a local draft over a cloud publish.
  */
 export async function resolveEventBySlug(slug: string): Promise<StoredEvent | null> {
   const local = await demoPersistence.getBySlug(slug);
   if (isDemoMode) return local;
 
   let remote: StoredEvent | null = null;
+
   try {
-    remote = await supabasePersistence.getBySlug(slug);
+    remote = await fetchPublicInviteBySlug(slug);
   } catch {
+    // Function not deployed / network / non-404 errors — fall through to PostgREST.
     remote = null;
+  }
+
+  if (!remote) {
+    try {
+      remote = await supabasePersistence.getBySlug(slug);
+    } catch {
+      remote = null;
+    }
   }
 
   if (remote?.status === "published") {
@@ -101,15 +113,34 @@ export async function resolveEventBySlug(slug: string): Promise<StoredEvent | nu
   return remote ?? local;
 }
 
+export type AddPublicRsvpOptions = {
+  /** Invite slug — preferred so the RSVP Edge service can resolve published status. */
+  slug?: string;
+};
+
 /**
- * Guest RSVP: Connected Mode always writes to Supabase so hosts see replies
- * from any device/browser. Do not silently fall back to localStorage — that
- * made cross-device RSVPs look successful while never reaching the host DB.
+ * Guest RSVP: Connected Mode always writes to the cloud SoR so hosts see replies
+ * from any device/browser. Prefer the RSVP Edge API; fall back to PostgREST insert.
+ * Do not silently fall back to localStorage.
  */
-export async function addPublicRsvp(rsvp: Rsvp): Promise<Rsvp> {
+export async function addPublicRsvp(rsvp: Rsvp, opts?: AddPublicRsvpOptions): Promise<Rsvp> {
   if (isDemoMode) return demoPersistence.addRsvp(rsvp);
 
-  const saved = await supabasePersistence.addRsvp(rsvp);
+  let saved: Rsvp | null = null;
+  try {
+    saved = await createPublicRsvpViaEdge(rsvp, { slug: opts?.slug });
+  } catch (err) {
+    // If Edge is missing (404 function) or gateway error, try PostgREST.
+    if (err instanceof EdgeApiError && err.status !== 404 && err.status < 500) {
+      throw err;
+    }
+    saved = null;
+  }
+
+  if (!saved) {
+    saved = await supabasePersistence.addRsvp(rsvp);
+  }
+
   try {
     await demoPersistence.addRsvp(saved);
   } catch {

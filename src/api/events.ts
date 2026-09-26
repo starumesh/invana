@@ -4,6 +4,7 @@
  */
 import { createDraftId, demoAuth, demoPersistence, isGuestLocalOwner, mergeLocalEvents, readLocalEvents, readLocalRsvps } from "@/services/demo";
 import { auth, isDemoMode } from "@/services";
+import { assertDurableMediaForPublish } from "@/lib/durableMedia";
 import { getSupabase } from "@/lib/supabase/client";
 import { supabasePersistence } from "@/services/supabase/persistence";
 import { promoteLocalMediaInEvent } from "@/services/supabase/promoteMedia";
@@ -428,15 +429,24 @@ export async function deleteEvent(id: string): Promise<void> {
 /**
  * Publish (or update published slug) via the same persistence path as save.
  * Marks listed so the event appears on My events.
+ * Connected Mode: enforces durable HTTPS media URLs (Phase 0 invariant) after promote-on-save.
  */
 export async function publishEvent(event: StoredEvent, slug: string): Promise<StoredEvent> {
-  return saveEvent({
+  const next: StoredEvent = {
     ...event,
     slug,
     status: "published",
     title: displayTitle(event.config),
     updatedAt: new Date().toISOString(),
-  });
+  };
+  // Demo Mode may keep data: URLs; Connected publish must be durable.
+  if (!isDemoMode) {
+    // saveEvent promotes local media first; assert after that path by saving then checking.
+    const saved = await saveEvent(next);
+    assertDurableMediaForPublish(saved);
+    return saved;
+  }
+  return saveEvent(next);
 }
 
 /**

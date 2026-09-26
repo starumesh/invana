@@ -2,7 +2,7 @@
 
 ## Boundary
 
-The frontend is a static SPA. The browser never holds privileged secrets. Backend work (when connected) goes through Supabase with the anon/publishable key + RLS, and Edge Functions for WhatsApp tokens.
+The frontend is a static SPA. The browser never holds privileged secrets. Backend work (when connected) goes through Supabase with the anon/publishable key + RLS, and Edge Functions for WhatsApp tokens **and** Phase 1 logical APIs (invite, RSVP, media, events publish, OG).
 
 Hosting targets: GitHub Pages (hash routes), or dedicated hosts (Vercel / Netlify / Cloudflare) with SPA rewrite configs — see [deployment.md](deployment.md).
 
@@ -22,12 +22,25 @@ Both surfaces read the same `RenderInput`. Field resolution (`lib/fields.ts`) tu
 
 | Interface | Demo Mode | Connected Mode |
 |-----------|-----------|----------------|
-| `PersistenceProvider` | `localStorage` (`services/demo.ts`) | Supabase `events` / `rsvps` |
+| `PersistenceProvider` | `localStorage` (`services/demo.ts`) | Supabase `events` / `rsvps` (host CRUD via PostgREST) |
 | `AuthProvider` | local demo user | Magic-link via `services/supabase/auth.ts` |
 | `MessagingProvider` | `wa.me` links | `wa.me` by default; Cloud API when `VITE_MESSAGING_MODE=cloud` |
-| `StorageProvider` | data URLs (`activeStorage` → demo) | Supabase Storage `event-media` public URLs when signed in; local media promoted on Save/claim |
+| `StorageProvider` | data URLs (`activeStorage` → demo) | Media Edge (preferred) or direct Storage `event-media` public URLs; local media promoted on Save/claim |
 
 `src/services/index.ts` selects Demo when `VITE_SUPABASE_URL` / publishable key are unset.
+
+Public guest paths prefer Edge logical APIs (`services/api/*` → `invite`, `rsvp`) with PostgREST fallback until functions are deployed.
+
+## Logical services (Phase 1)
+
+| Edge Function | Product route | Notes |
+|---------------|---------------|-------|
+| `invite` | `GET /v1/invites/{slug}` | Public projection; rate-limited |
+| `rsvp` | `POST /v1/invites/{slug}/rsvps`, host `GET …/rsvps` | Cloud SoR; no silent local fallback |
+| `media` | `POST /v1/media/uploads` | MIME/size checks; public bucket URLs |
+| `events` | `POST …/publish` / `unpublish` | Durable-media gate on publish |
+| `og-invite` | OG HTML for crawlers | Optional CDN/proxy wiring |
+| `whatsapp-*` | Messaging | Existing |
 
 ## Folders
 
@@ -38,10 +51,12 @@ Both surfaces read the same `RenderInput`. Field resolution (`lib/fields.ts`) tu
 - `src/lib/render` — SVG composition, motifs, text fitting
 - `src/lib/export` — SVG → canvas PNG/JPEG (images inlined as data URLs); PDF via jsPDF
 - `src/lib/mediaUrl` — blob/data URL helpers + Storage promotion inputs
+- `src/lib/durableMedia` — publish-time durable URL invariant
 - `src/lib/supabase` — browser client factory
 - `src/config` — event types, card types, themes, welcome messages
 - `src/services` — provider interfaces + demo / supabase implementations
-- `supabase/` — SQL migrations, RLS, Storage policies, Edge Function stubs
+- `src/services/api` — Edge logical API clients (invite / rsvp / media)
+- `supabase/` — SQL migrations, RLS, Storage policies, Edge Functions
 
 ## Routing
 

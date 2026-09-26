@@ -1,15 +1,28 @@
 import { createId } from "@/lib/id";
 import { requireSupabase } from "@/lib/supabase/client";
+import { uploadImageViaEdge } from "@/services/api/mediaApi";
+import { EdgeApiError } from "@/services/api/edgeClient";
 import type { StorageProvider } from "@/services/types";
 
 const BUCKET = "event-media";
 
 /**
- * Uploads to Supabase Storage. Host must be signed in.
- * Returns a public object URL (bucket is public-read; writes remain owner-only via RLS).
+ * Uploads to Supabase Storage (public-read bucket). Host must be signed in.
+ * Prefers Media Edge Function (MIME/size validation + metadata); falls back to
+ * direct Storage upload when the function is not deployed.
  */
 export const supabaseStorage: StorageProvider = {
   async uploadImage(opts) {
+    try {
+      const viaEdge = await uploadImageViaEdge(opts);
+      if (viaEdge) return viaEdge;
+    } catch (err) {
+      // Validation errors from Media service should surface; missing function → direct upload.
+      if (err instanceof EdgeApiError && err.status >= 400 && err.status < 500 && err.status !== 404) {
+        throw err;
+      }
+    }
+
     const sb = requireSupabase();
     const { data: authData, error: authError } = await sb.auth.getUser();
     if (authError || !authData.user) {

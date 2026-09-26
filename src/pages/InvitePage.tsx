@@ -135,7 +135,7 @@ export function InvitePage() {
       createdAt: new Date().toISOString(),
     };
     try {
-      await addPublicRsvp(rsvp);
+      await addPublicRsvp(rsvp, { slug });
       setSubmitted(true);
     } catch (err) {
       setError(
