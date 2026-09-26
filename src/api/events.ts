@@ -2,18 +2,11 @@
  * Events API — single facade for create / save / list / delete / publish / claim.
  * UI pages call these functions only; adapters (local guest vs Supabase account) stay here.
  */
-import {
-  createDraftId,
-  demoAuth,
-  demoPersistence,
-  isGuestLocalOwner,
-  mergeLocalEvents,
-  readLocalEvents,
-  readLocalRsvps,
-} from "@/services/demo";
+import { createDraftId, demoAuth, demoPersistence, isGuestLocalOwner, mergeLocalEvents, readLocalEvents, readLocalRsvps } from "@/services/demo";
 import { auth, isDemoMode } from "@/services";
 import { getSupabase } from "@/lib/supabase/client";
 import { supabasePersistence } from "@/services/supabase/persistence";
+import { promoteLocalMediaInEvent } from "@/services/supabase/promoteMedia";
 import { blankFields, displayTitle } from "@/lib/fields";
 import { uniqueSlug } from "@/lib/slug";
 import { getTemplate } from "@/templates/registry";
@@ -73,6 +66,7 @@ export function isListedEvent(event: StoredEvent): boolean {
  * Signed in → Supabase (source of truth) + local mirror.
  * Signed out (Connected) → localStorage guest session only.
  * Always marks the event listed so it appears on My events after Save/Publish.
+ * Promotes browser-local photos (blob:/data:) to Storage before cloud upsert.
  */
 export async function saveEvent(event: StoredEvent): Promise<StoredEvent> {
   const listed: StoredEvent = { ...event, listed: true };
@@ -92,11 +86,21 @@ export async function saveEvent(event: StoredEvent): Promise<StoredEvent> {
     return demoPersistence.saveEvent(next);
   }
 
-  const next: StoredEvent = {
+  let next: StoredEvent = {
     ...listed,
     userId: accountId,
     updatedAt: listed.updatedAt || new Date().toISOString(),
   };
+
+  try {
+    next = await promoteLocalMediaInEvent(next);
+  } catch (err) {
+    throw new Error(
+      err instanceof Error
+        ? `Could not upload photos to storage: ${err.message}`
+        : "Could not upload photos to storage.",
+    );
+  }
 
   const stored = await supabasePersistence.saveEvent(next);
   // Preserve listed:true — cloud row has no listed column, so merge it back.
@@ -183,12 +187,17 @@ export async function claimLocalDrafts(): Promise<StoredEvent[]> {
 
     const claimed: StoredEvent[] = await Promise.all(
       guests.map(async (event) => {
-        const next: StoredEvent = {
+        let next: StoredEvent = {
           ...event,
           userId,
           listed: true,
           updatedAt: new Date().toISOString(),
         };
+        try {
+          next = await promoteLocalMediaInEvent(next);
+        } catch {
+          /* keep local media URLs — save may still succeed for non-media fields */
+        }
         try {
           const stored = await supabasePersistence.saveEvent(next);
           return { ...stored, listed: true };
@@ -342,12 +351,17 @@ function reconcileLocalDraftWithCloud(local: StoredEvent): void {
       // Never-saved working drafts stay local-only until saveEvent.
       if (local.listed === false) return;
 
-      const claimed: StoredEvent = {
+      let claimed: StoredEvent = {
         ...local,
         userId: accountId,
         listed: true,
         updatedAt: new Date().toISOString(),
       };
+      try {
+        claimed = await promoteLocalMediaInEvent(claimed);
+      } catch {
+        /* continue with local media URLs */
+      }
       try {
         const stored = await supabasePersistence.saveEvent(claimed);
         await demoPersistence.saveEvent({ ...stored, listed: true });

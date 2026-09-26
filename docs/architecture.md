@@ -25,7 +25,7 @@ Both surfaces read the same `RenderInput`. Field resolution (`lib/fields.ts`) tu
 | `PersistenceProvider` | `localStorage` (`services/demo.ts`) | Supabase `events` / `rsvps` |
 | `AuthProvider` | local demo user | Magic-link via `services/supabase/auth.ts` |
 | `MessagingProvider` | `wa.me` links | `wa.me` by default; Cloud API when `VITE_MESSAGING_MODE=cloud` |
-| `StorageProvider` | object URLs (`activeStorage` → demo) | Supabase Storage `event-media` public URLs when signed in |
+| `StorageProvider` | data URLs (`activeStorage` → demo) | Supabase Storage `event-media` public URLs when signed in; local media promoted on Save/claim |
 
 `src/services/index.ts` selects Demo when `VITE_SUPABASE_URL` / publishable key are unset.
 
@@ -36,7 +36,8 @@ Both surfaces read the same `RenderInput`. Field resolution (`lib/fields.ts`) tu
 - `src/components/invitation` — public invite sections (countdown, map)
 - `src/templates` — registry + factories (data-driven, not one-off JSX pages)
 - `src/lib/render` — SVG composition, motifs, text fitting
-- `src/lib/export` — SVG → canvas PNG/JPEG; PDF via jsPDF
+- `src/lib/export` — SVG → canvas PNG/JPEG (images inlined as data URLs); PDF via jsPDF
+- `src/lib/mediaUrl` — blob/data URL helpers + Storage promotion inputs
 - `src/lib/supabase` — browser client factory
 - `src/config` — event types, card types, themes, welcome messages
 - `src/services` — provider interfaces + demo / supabase implementations

@@ -1,4 +1,4 @@
-import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { demoAuth, demoMessaging, demoPersistence } from "@/services/demo";
 import { demoStorage } from "@/services/demoStorage";
 import { supabaseAuth } from "@/services/supabase/auth";
@@ -57,11 +57,24 @@ export function activePersistence(): PersistenceProvider {
 
 /**
  * Media uploads: Supabase Storage when signed in to Connected Mode,
- * otherwise browser object/data URLs (Demo Mode or signed-out guest).
+ * otherwise browser data URLs (Demo Mode or signed-out guest).
  */
 export function activeStorage(): StorageProvider {
   if (isDemoMode) return demoStorage;
   return hasAuthSession() ? supabaseStorage : demoStorage;
+}
+
+/**
+ * Async storage picker — prefers a live Supabase session (not only the sync cache)
+ * so uploads after sign-in hit Storage even if AuthSession cache is briefly cold.
+ */
+export async function resolveActiveStorage(): Promise<StorageProvider> {
+  if (isDemoMode) return demoStorage;
+  if (hasAuthSession()) return supabaseStorage;
+  const sb = getSupabase();
+  if (!sb) return demoStorage;
+  const { data } = await sb.auth.getSession();
+  return data.session?.user?.id ? supabaseStorage : demoStorage;
 }
 
 /**
@@ -88,20 +101,21 @@ export async function resolveEventBySlug(slug: string): Promise<StoredEvent | nu
   return remote ?? local;
 }
 
-/** Guest RSVP: prefer cloud in Connected Mode so hosts see responses. */
+/**
+ * Guest RSVP: Connected Mode always writes to Supabase so hosts see replies
+ * from any device/browser. Do not silently fall back to localStorage — that
+ * made cross-device RSVPs look successful while never reaching the host DB.
+ */
 export async function addPublicRsvp(rsvp: Rsvp): Promise<Rsvp> {
   if (isDemoMode) return demoPersistence.addRsvp(rsvp);
+
+  const saved = await supabasePersistence.addRsvp(rsvp);
   try {
-    const saved = await supabasePersistence.addRsvp(rsvp);
-    try {
-      await demoPersistence.addRsvp(saved);
-    } catch {
-      /* ignore local mirror failures */
-    }
-    return saved;
+    await demoPersistence.addRsvp(saved);
   } catch {
-    return demoPersistence.addRsvp(rsvp);
+    /* ignore local mirror failures — cloud row is source of truth */
   }
+  return saved;
 }
 
 export function modeLabel() {

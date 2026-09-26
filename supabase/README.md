@@ -28,7 +28,7 @@ If builder uploads fail with bucket/policy errors, or objects never appear under
 
 Object path convention: `{user_id}/{event_id}/{filename}`.
 
-Signed-in uploads use `activeStorage()` → `supabaseStorage` and save the **public URL** into event field values. Demo Mode / signed-out guests keep browser-local object URLs.
+Signed-in uploads use `resolveActiveStorage()` → `supabaseStorage` and save the **public URL** into event field values. Demo Mode / signed-out guests keep durable data URLs; Save / claim promotes them to Storage.
 
 ## Tables (V1)
 
@@ -50,6 +50,7 @@ Signed-in uploads use `activeStorage()` → `supabaseStorage` and save the **pub
 - **Creators** access only their own rows (`auth.uid() = user_id` / `profiles.id`).
 - **Published events** are readable by anyone (anon + authenticated) for the public invite page.
 - **RSVP insert** allowed when the target event is `published`; guests **cannot** `SELECT` the guest list.
+  Client inserts use `insert` without `.select()` so anon RSVPs from other devices succeed (RETURNING would fail host-only SELECT RLS).
 - **Hosts** can `SELECT` RSVPs for their events.
 - **WhatsApp secrets** never live in the browser — Edge Functions use the service role + Meta tokens.
 
