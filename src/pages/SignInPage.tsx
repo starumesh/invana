@@ -23,12 +23,37 @@ export function SignInPage() {
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  if (ready && isDemoMode) {
-    return <Navigate to="/dashboard" replace />;
+  if (ready && signedIn && !isDemoMode) {
+    return <Navigate to={from} replace />;
   }
 
-  if (ready && signedIn) {
-    return <Navigate to={from} replace />;
+  // Demo Mode has no email auth — keep /signin reachable with a clear Connected Mode path.
+  if (ready && isDemoMode) {
+    return (
+      <main className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-16">
+        <h1 className="font-serif text-4xl">Sign in</h1>
+        <p className="mt-3 text-ink-muted">
+          This local app is running in <span className="text-ink">Demo Mode</span>, which stores
+          drafts in the browser and does not use email accounts.
+        </p>
+        <p className="mt-4 text-sm text-ink-muted">
+          To sign in for Connected Mode, set <code className="text-ink">VITE_SUPABASE_URL</code> and{" "}
+          <code className="text-ink">VITE_SUPABASE_PUBLISHABLE_KEY</code> in <code className="text-ink">.env</code>{" "}
+          (see <code className="text-ink">.env.example</code>), then restart{" "}
+          <code className="text-ink">npm run dev</code>. Sign in will appear in the header once
+          Connected Mode is active.
+        </p>
+        <p className="mt-8 text-center text-sm text-ink-muted">
+          <Link to="/dashboard" className="underline hover:text-ink">
+            Continue in Demo Mode
+          </Link>
+          {" · "}
+          <Link to="/" className="underline hover:text-ink">
+            Back home
+          </Link>
+        </p>
+      </main>
+    );
   }
 
   async function onSubmit(e: FormEvent) {

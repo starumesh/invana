@@ -32,18 +32,28 @@ export function Shell() {
                 </NavLink>
               ))}
             </nav>
-            {!isDemoMode && ready ? (
-              signedIn ? (
+            {ready ? (
+              !isDemoMode && signedIn ? (
                 <UserMenu
                   email={user?.email || user?.name || "Account"}
                   onSignOut={() => void signOut()}
                 />
               ) : (
-                <Link to="/signin" className="shrink-0">
-                  <Button size="sm" variant="secondary">
-                    Sign in
-                  </Button>
-                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  {isDemoMode ? (
+                    <span
+                      className="hidden text-xs text-ink-muted sm:inline"
+                      title="Local Demo Mode — set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY for Connected Mode"
+                    >
+                      Demo Mode
+                    </span>
+                  ) : null}
+                  <Link to="/signin" className="shrink-0">
+                    <Button size="sm" variant="secondary">
+                      Sign in
+                    </Button>
+                  </Link>
+                </div>
               )
             ) : null}
           </div>
@@ -66,11 +76,9 @@ export function Shell() {
             <Link to="/dashboard" className="hover:text-ink">
               My events
             </Link>
-            {!isDemoMode ? (
-              <Link to="/signin" className="hover:text-ink">
-                Sign in
-              </Link>
-            ) : null}
+            <Link to="/signin" className="hover:text-ink">
+              Sign in
+            </Link>
           </div>
         </div>
       </footer>

@@ -2,11 +2,14 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
 
-/** True when both public Supabase env vars are non-empty. */
+/** True when both public Supabase env vars look like a real Connected Mode project. */
 export function isSupabaseConfigured(): boolean {
-  const url = import.meta.env.VITE_SUPABASE_URL?.trim();
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
-  return Boolean(url && key);
+  const url = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+  if (!url || !key) return false;
+  // Treat .env.example placeholders as unset so Demo Mode (and Sign in) stay consistent.
+  if (/YOUR_PROJECT/i.test(url) || key === "eyJ..." || key.includes("YOUR_")) return false;
+  return true;
 }
 
 /**
