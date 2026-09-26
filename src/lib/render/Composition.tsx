@@ -288,6 +288,10 @@ function CoverCropImage({
   useEffect(() => {
     let active = true;
     const img = new Image();
+    // Allow canvas/export pipelines to read Storage URLs when CORS is configured.
+    if (/^https?:/i.test(href)) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => {
       if (!active) return;
       const w = img.naturalWidth || img.width;

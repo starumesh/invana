@@ -220,9 +220,12 @@ export const supabasePersistence: PersistenceProvider = {
       message: rsvp.message ?? null,
       created_at: rsvp.createdAt,
     };
-    const { data, error } = await sb.from("rsvps").insert(row).select("*").single();
+    // Insert without .select(): guests may INSERT for published events but cannot
+    // SELECT RSVPs (host-only). insert().select().single() fails for anon/other
+    // browsers even when the row was written — or surfaces as a failed RSVP.
+    const { error } = await sb.from("rsvps").insert(row);
     if (error) throw new Error(error.message);
-    return toRsvp(data as RsvpRow);
+    return rsvp;
   },
 
   async takenSlugs(excludeEventId) {

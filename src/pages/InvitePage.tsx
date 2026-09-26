@@ -134,8 +134,16 @@ export function InvitePage() {
       message: parsed.data.message || undefined,
       createdAt: new Date().toISOString(),
     };
-    await addPublicRsvp(rsvp);
-    setSubmitted(true);
+    try {
+      await addPublicRsvp(rsvp);
+      setSubmitted(true);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not save your RSVP. Check your connection and try again.",
+      );
+    }
   }
 
   if (missing) {

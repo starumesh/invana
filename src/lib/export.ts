@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { urlToDataUrl } from "@/lib/mediaUrl";
 import type { TemplateDefinition } from "@/types";
 
 export type ImagePreset = "digital" | "high" | "print";
@@ -17,13 +18,50 @@ export async function waitForFonts(): Promise<void> {
   }
 }
 
+function readImageHref(image: SVGImageElement): string {
+  return (
+    image.getAttribute("href") ||
+    image.getAttributeNS(XLINK_NS, "href") ||
+    image.getAttribute("xlink:href") ||
+    ""
+  );
+}
+
+function writeImageHref(image: SVGImageElement, href: string) {
+  image.setAttribute("href", href);
+  image.setAttributeNS(XLINK_NS, "href", href);
+  image.setAttribute("xlink:href", href);
+}
+
+/**
+ * Embed remote/blob image hrefs as data URLs so SVG→canvas rasterization includes
+ * photos (blob URLs and cross-origin Storage URLs fail inside a serialized SVG blob).
+ */
+async function inlineSvgImages(clone: SVGSVGElement): Promise<void> {
+  const images = Array.from(clone.querySelectorAll("image"));
+  await Promise.all(
+    images.map(async (node) => {
+      const image = node as SVGImageElement;
+      const href = readImageHref(image);
+      if (!href || href.startsWith("data:")) return;
+      try {
+        const dataUrl = await urlToDataUrl(href);
+        writeImageHref(image, dataUrl);
+      } catch {
+        // Leave original href — export may still succeed for other layers.
+      }
+    }),
+  );
+}
+
 /**
  * Prepare a live preview SVG for rasterization:
  * - absolute width/height
  * - xlink namespace + dual href/xlink:href on images
+ * - images inlined as data URLs (photos survive PNG/PDF)
  * - clip-path attributes normalized so url(#id) resolves inside the blob SVG
  */
-function prepareSvgClone(svg: SVGSVGElement): SVGSVGElement {
+async function prepareSvgClone(svg: SVGSVGElement): Promise<SVGSVGElement> {
   const clone = svg.cloneNode(true) as SVGSVGElement;
   const width = Number(svg.viewBox.baseVal.width || svg.clientWidth || 1080);
   const height = Number(svg.viewBox.baseVal.height || svg.clientHeight || 1512);
@@ -51,21 +89,15 @@ function prepareSvgClone(svg: SVGSVGElement): SVGSVGElement {
 
   clone.querySelectorAll("image").forEach((node) => {
     const image = node as SVGImageElement;
-    const href =
-      image.getAttribute("href") ||
-      image.getAttributeNS(XLINK_NS, "href") ||
-      image.getAttribute("xlink:href") ||
-      "";
-    if (href) {
-      image.setAttribute("href", href);
-      image.setAttributeNS(XLINK_NS, "href", href);
-      image.setAttribute("xlink:href", href);
-    }
+    const href = readImageHref(image);
+    if (href) writeImageHref(image, href);
     // Ensure cover-crop survives rasterize even if natural-size layout wasn't ready.
     if (!image.getAttribute("preserveAspectRatio")) {
       image.setAttribute("preserveAspectRatio", "xMidYMid slice");
     }
   });
+
+  await inlineSvgImages(clone);
 
   // React may leave clipPath camelCase; blob SVG rasterizers expect clip-path.
   clone.querySelectorAll("[clipPath], [clip-path]").forEach((el) => {
@@ -80,7 +112,7 @@ function prepareSvgClone(svg: SVGSVGElement): SVGSVGElement {
 
 export async function rasterizeSvg(svg: SVGSVGElement, scale: number): Promise<HTMLCanvasElement> {
   await waitForFonts();
-  const clone = prepareSvgClone(svg);
+  const clone = await prepareSvgClone(svg);
   const width = Number(clone.getAttribute("width") || 1080);
   const height = Number(clone.getAttribute("height") || 1512);
 
