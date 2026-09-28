@@ -168,6 +168,33 @@ export function metaForPath(pathname: string): PageMeta {
     };
   }
 
+  if (path.startsWith("/pass/")) {
+    return {
+      title: `Your Event Pass | ${SITE_NAME}`,
+      description: "Your personal entry pass. Show the QR code at the entrance.",
+      keywords: DEFAULT_KEYWORDS,
+      noIndex: true,
+    };
+  }
+
+  if (path === "/events" || /^\/events\/(create|[^/]+\/[^/]+)$/.test(path)) {
+    return {
+      title: `Events | ${SITE_NAME}`,
+      description: "Manage events, guest passes, check-in, and attendance.",
+      keywords: DEFAULT_KEYWORDS,
+      noIndex: true,
+    };
+  }
+
+  if (path.startsWith("/events/")) {
+    return {
+      title: `Event | ${SITE_NAME}`,
+      description: "Event details, schedule, venue, and directions — shared with Invana.",
+      keywords: DEFAULT_KEYWORDS,
+      type: "article",
+    };
+  }
+
   if (path.startsWith("/invite/")) {
     return {
       title: `You're Invited | ${SITE_NAME}`,

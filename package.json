@@ -10,12 +10,16 @@
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:db": "bash supabase/tests/run-local.sh",
+    "test:edge": "bash supabase/tests/run-integration.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
     "clsx": "^2.1.1",
     "jspdf": "^2.5.2",
+    "jsqr": "^1.4.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -25,6 +29,7 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.9.0",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.12",

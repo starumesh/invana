@@ -26,12 +26,16 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
  */
 export class MemoryEventRepository implements EventRepository {
   data: MemorySnapshot;
-  private buckets = new Map<string, number>();
+  private buckets: Map<string, number>;
   private onChange?: (data: MemorySnapshot) => void;
   private maxAudit: number;
 
-  constructor(initial?: MemorySnapshot, opts: { onChange?: (data: MemorySnapshot) => void; maxAudit?: number } = {}) {
+  constructor(
+    initial?: MemorySnapshot,
+    opts: { onChange?: (data: MemorySnapshot) => void; maxAudit?: number; buckets?: Map<string, number> } = {},
+  ) {
     this.data = initial ? clone(initial) : emptySnapshot();
+    this.buckets = opts.buckets ?? new Map();
     this.onChange = opts.onChange;
     this.maxAudit = opts.maxAudit ?? 5000;
   }

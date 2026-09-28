@@ -8,3 +8,7 @@ dist-ssr
 coverage
 playwright-report
 test-results
+
+# Playwright
+test-results/
+playwright-report/

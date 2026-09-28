@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/Button";
 
 const links = [
   { to: "/templates", label: "Templates" },
-  { to: "/dashboard", label: "My events" },
+  { to: "/events", label: "Events" },
+  { to: "/dashboard", label: "My invitations" },
 ];
 
 export function Shell() {
@@ -73,8 +74,11 @@ export function Shell() {
             <Link to="/templates" className="hover:text-ink">
               Templates
             </Link>
+            <Link to="/events" className="hover:text-ink">
+              Events
+            </Link>
             <Link to="/dashboard" className="hover:text-ink">
-              My events
+              My invitations
             </Link>
             <Link to="/signin" className="hover:text-ink">
               Sign in
