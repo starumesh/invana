@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 const links = [
   { to: "/templates", label: "Templates" },
   { to: "/events", label: "Events" },
-  { to: "/dashboard", label: "My invitations" },
+  { to: "/dashboard", label: "Invitations" },
 ];
 
 export function Shell() {
