@@ -232,15 +232,20 @@ export function resolveFields(_template: TemplateDefinition, input: RenderInput,
     venueName: text(fields, "venueName") || title,
     cityLine: [address, city].filter(Boolean).join(" · "),
     qrUrl,
-    coverImage: text(fields, "coverImage"),
+    coverImage: text(fields, "coverImage") || text(fields, "photo"),
     photo: text(fields, "photo") || text(fields, "coverImage"),
-    photo2: text(fields, "photo2") || text(fields, "coverImage"),
-    photo3: text(fields, "photo3") || text(fields, "photo2") || text(fields, "coverImage"),
+    photo2: text(fields, "photo2") || text(fields, "coverImage") || text(fields, "photo"),
+    photo3:
+      text(fields, "photo3") ||
+      text(fields, "photo2") ||
+      text(fields, "coverImage") ||
+      text(fields, "photo"),
     photo4:
       text(fields, "photo4") ||
       text(fields, "photo3") ||
       text(fields, "photo2") ||
-      text(fields, "coverImage"),
+      text(fields, "coverImage") ||
+      text(fields, "photo"),
     fullName: name || primary,
     roleLine: occupationLine || [job || text(fields, "profession"), company].filter(Boolean).join(" · "),
     factLine: facts || personalLine,

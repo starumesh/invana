@@ -5,9 +5,11 @@
 import { createDraftId, demoAuth, demoPersistence, isGuestLocalOwner, mergeLocalEvents, readLocalEvents, readLocalRsvps } from "@/services/demo";
 import { auth, isDemoMode } from "@/services";
 import { assertDurableMediaForPublish } from "@/lib/durableMedia";
+import { eventMediaPathsFromEvent, unreferencedEventMediaPaths } from "@/lib/mediaUrl";
 import { getSupabase } from "@/lib/supabase/client";
 import { supabasePersistence } from "@/services/supabase/persistence";
 import { promoteLocalMediaInEvent } from "@/services/supabase/promoteMedia";
+import { supabaseStorage } from "@/services/supabase/storage";
 import { blankFields, displayTitle } from "@/lib/fields";
 import { uniqueSlug } from "@/lib/slug";
 import { getTemplate } from "@/templates/registry";
@@ -63,6 +65,10 @@ export function isListedEvent(event: StoredEvent): boolean {
   return event.listed !== false;
 }
 
+async function removeEventMediaPaths(paths: string[]): Promise<void> {
+  await Promise.allSettled(paths.map((path) => supabaseStorage.removeImage?.(path)));
+}
+
 /**
  * Signed in → Supabase (source of truth) + local mirror.
  * Signed out (Connected) → localStorage guest session only.
@@ -92,6 +98,12 @@ export async function saveEvent(event: StoredEvent): Promise<StoredEvent> {
     userId: accountId,
     updatedAt: listed.updatedAt || new Date().toISOString(),
   };
+  let previousRemote: StoredEvent | null = null;
+  try {
+    previousRemote = await supabasePersistence.getEvent(event.id);
+  } catch {
+    // Cleanup is optional; saving must still work if the prior read is unavailable.
+  }
 
   try {
     next = await promoteLocalMediaInEvent(next);
@@ -103,7 +115,21 @@ export async function saveEvent(event: StoredEvent): Promise<StoredEvent> {
     );
   }
 
-  const stored = await supabasePersistence.saveEvent(next);
+  let stored: StoredEvent;
+  try {
+    stored = await supabasePersistence.saveEvent(next);
+  } catch (err) {
+    // Promotion can succeed before the row write fails. Remove only paths added
+    // during this attempt, never media already referenced by the working event.
+    await removeEventMediaPaths(unreferencedEventMediaPaths(next, listed));
+    throw err;
+  }
+
+  // Delete replaced/removed objects only after the new event config is durable.
+  if (previousRemote) {
+    await removeEventMediaPaths(unreferencedEventMediaPaths(previousRemote, stored));
+  }
+
   // Preserve listed:true — cloud row has no listed column, so merge it back.
   const mirrored: StoredEvent = { ...stored, listed: true };
   await demoPersistence.saveEvent(mirrored);
@@ -407,7 +433,9 @@ export async function getEvent(id: string): Promise<StoredEvent | null> {
   return null;
 }
 
-/** Delete from account store (when signed in) and always clear local mirror. */
+/** Delete from account store (when signed in) and always clear local mirror.
+ * Connected Mode also best-effort deletes Storage objects for the event.
+ */
 export async function deleteEvent(id: string): Promise<void> {
   if (isDemoMode) {
     await demoPersistence.deleteEvent(id);
@@ -415,11 +443,45 @@ export async function deleteEvent(id: string): Promise<void> {
   }
 
   const accountId = await resolveAccountUserId();
+
+  // Gather known media paths before the event row disappears.
+  const knownPaths = new Set<string>();
+  try {
+    const local = await demoPersistence.getEvent(id);
+    if (local) {
+      for (const path of eventMediaPathsFromEvent(local)) knownPaths.add(path);
+    }
+  } catch {
+    /* ignore */
+  }
   if (accountId) {
     try {
-      await supabasePersistence.deleteEvent(id);
+      const remote = await supabasePersistence.getEvent(id);
+      if (remote) {
+        for (const path of eventMediaPathsFromEvent(remote)) knownPaths.add(path);
+      }
     } catch {
       /* may only exist locally */
+    }
+
+    let remoteDeleted = false;
+    try {
+      await supabasePersistence.deleteEvent(id);
+      remoteDeleted = true;
+    } catch {
+      /* may only exist locally */
+    }
+
+    // Never remove photos while a remote event may still reference them.
+    if (remoteDeleted) {
+      try {
+        await supabaseStorage.removeAllForEvent?.({
+          eventId: id,
+          knownPaths: [...knownPaths],
+        });
+      } catch (err) {
+        console.warn("[deleteEvent] storage cleanup failed:", err);
+      }
     }
   }
 

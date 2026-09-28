@@ -1,16 +1,24 @@
 /** Demo / guest storage: durable data URLs in the browser (no backend). */
+import { prepareImageForUpload } from "@/lib/imageOptimize";
 import { blobToDataUrl } from "@/lib/mediaUrl";
 import type { StorageProvider } from "@/services/types";
 
 export const demoStorage: StorageProvider = {
   async uploadImage(opts) {
-    // Prefer data URLs over blob: so photos survive localStorage, reload, and SVG→PNG/PDF export.
-    const url = await blobToDataUrl(opts.file);
+    // Compress first so localStorage / Demo Mode does not bloat with multi‑MB data URLs.
+    const file = await prepareImageForUpload(opts.file);
+    const url = await blobToDataUrl(file);
     return {
-      path: `demo/${opts.eventId ?? "local"}/${opts.file.name}`,
+      path: `demo/${opts.eventId ?? "local"}/${file.name}`,
       url,
-      mimeType: opts.file.type || "image/jpeg",
-      byteSize: opts.file.size,
+      mimeType: file.type || "image/jpeg",
+      byteSize: file.size,
     };
+  },
+  async removeImage() {
+    /* browser-local data URLs — nothing to delete remotely */
+  },
+  async removeAllForEvent() {
+    /* no-op */
   },
 };

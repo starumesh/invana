@@ -19,11 +19,13 @@ export async function promoteLocalMediaInEvent(event: StoredEvent): Promise<Stor
   if (!localKeys.length) return event;
 
   const nextFields: Record<string, unknown> = { ...fields };
-  await Promise.all(
+  const uploadedUrls: string[] = [];
+  const results = await Promise.allSettled(
     localKeys.map(async ([key, url]) => {
       const file = await urlToImageFile(url, key);
       const prepared = await prepareImageForUpload(file);
       const uploaded = await supabaseStorage.uploadImage({ file: prepared, eventId: event.id });
+      uploadedUrls.push(uploaded.url);
       nextFields[key] = uploaded.url;
       if (url.startsWith("blob:")) {
         try {
@@ -34,6 +36,13 @@ export async function promoteLocalMediaInEvent(event: StoredEvent): Promise<Stor
       }
     }),
   );
+  const failed = results.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+  if (failed) {
+    await Promise.allSettled(uploadedUrls.map((url) => supabaseStorage.removeImage?.(url)));
+    throw failed.reason;
+  }
 
   return {
     ...event,

@@ -37,6 +37,16 @@ export type UploadedMedia = {
 
 export interface StorageProvider {
   uploadImage(opts: { file: File; eventId?: string }): Promise<UploadedMedia>;
+  /**
+   * Best-effort delete of a Storage object (public URL or bucket-relative path).
+   * No-op in Demo Mode / for non-Storage URLs.
+   */
+  removeImage?(urlOrPath: string): Promise<void>;
+  /**
+   * Best-effort delete of all objects for an event (folder + known field URLs).
+   * Used when deleting an event so S3 does not keep orphans.
+   */
+  removeAllForEvent?(opts: { eventId: string; knownPaths?: string[] }): Promise<void>;
 }
 
 export interface AIProvider {

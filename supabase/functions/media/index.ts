@@ -84,7 +84,7 @@ serve(async (req) => {
     const { error: uploadErr } = await admin.storage.from(BUCKET).upload(path, bytes, {
       contentType: mimeType,
       upsert: false,
-      cacheControl: "3600",
+      cacheControl: "31536000",
     });
     if (uploadErr) {
       return json({ error: uploadErr.message }, 400, { requestId: rid });

@@ -7,7 +7,7 @@ values (
   'event-media',
   'event-media',
   true,
-  10485760, -- 10 MB
+  2097152, -- 2 MB (client compresses before upload)
   array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 )
 on conflict (id) do update set

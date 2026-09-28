@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { messagesFor } from "@/config/welcome-messages";
 import { Input, Label, Select, Textarea } from "@/components/ui/Field";
-import { ImageOptimizeError, prepareImageForUpload } from "@/lib/imageOptimize";
-import { resolveActiveStorage } from "@/services";
+import { ImageOptimizeError } from "@/lib/imageOptimize";
+import { demoStorage } from "@/services/demoStorage";
 import type { DateValue, EventTypeId, FieldSpec, TimeValue } from "@/types";
 
 type Props = {
@@ -16,7 +16,7 @@ type Props = {
 const OPTIONAL_GROUP = "More details";
 const PHOTO_GROUPS = new Set(["Photo", "Photos"]);
 const COVER_CROP_HINT =
-  "Portrait or landscape — we’ll cover-crop to the frame. Max 2 MB (we compress before upload).";
+  "Portrait or landscape — we’ll cover-crop to the frame. Max 2 MB (we compress automatically).";
 
 export function DynamicFields({ fields, values, eventType, eventId, onChange }: Props) {
   const [moreOpen, setMoreOpen] = useState(false);
@@ -428,9 +428,9 @@ function ImageField({
     setUploading(true);
     setUploadError("");
     try {
-      const prepared = await prepareImageForUpload(file);
-      const storage = await resolveActiveStorage();
-      const uploaded = await storage.uploadImage({ file: prepared, eventId });
+      // Stage locally. Connected Mode promotes the data URL to Storage during
+      // save, so leaving an unsaved builder cannot orphan or delete cloud media.
+      const uploaded = await demoStorage.uploadImage({ file, eventId });
       onChange(uploaded.url);
     } catch (err) {
       const message =
@@ -443,6 +443,12 @@ function ImageField({
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleRemove() {
+    setUploadError("");
+    // Cloud cleanup happens after the edited event is saved successfully.
+    onChange("");
   }
 
   if (compact) {
@@ -475,10 +481,7 @@ function ImageField({
                 type="button"
                 className="mt-1.5 text-xs text-ink-muted underline"
                 disabled={uploading}
-                onClick={() => {
-                  setUploadError("");
-                  onChange("");
-                }}
+                onClick={handleRemove}
               >
                 Remove
               </button>
@@ -505,10 +508,7 @@ function ImageField({
             type="button"
             className="text-sm text-ink-muted underline"
             disabled={uploading}
-            onClick={() => {
-              setUploadError("");
-              onChange("");
-            }}
+            onClick={handleRemove}
           >
             Remove
           </button>
