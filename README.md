@@ -34,6 +34,12 @@ Production site: **https://invana.stream**
 - Edge APIs for invite reads, RSVP writes, media, optional WhatsApp, event
   publish/unpublish, and OG metadata (see the integration-status table below).
 - Row Level Security, owner-scoped Storage writes, request IDs, and rate limiting.
+- **Event Management, Digital Pass & Attendance** (`/events`): multi-step event
+  creation (details, venue + map pin, capacity, timeline, guests + CSV import,
+  review), draft → publish → public `/events/:slug` page, one secure QR pass per
+  guest (`/pass/:token`), mobile camera check-in with server-side verification,
+  door-staff accounts, and live attendance. See
+  [Event Management](#event-management-digital-pass--attendance).
 
 ---
 
@@ -74,9 +80,12 @@ Invana enters Connected Mode only when both `VITE_SUPABASE_URL` and
 | `npm run preview` | Serve the production build |
 | `npm run typecheck` | Validate TypeScript |
 | `npm run lint` | Run ESLint with zero warnings |
-| `npm test` | Run Vitest tests |
+| `npm test` | Run Vitest tests (unit + Event Management API suite) |
+| `npm run test:e2e` | Playwright E2E in Demo Mode (first run: `npx playwright install chromium`) |
+| `npm run test:db` | Apply migrations to a throwaway local Postgres and run SQL assertions |
+| `npm run test:edge` | Edge repository integration test against Postgres + PostgREST (needs `psql`, `postgrest`, `deno`) |
 
-There are currently **22 Vitest tests across 5 files**. The GitHub Pages
+There are currently **82 Vitest tests across 8 files** and **11 Playwright tests**. The GitHub Pages
 workflow runs lint, type-check, and build on `main`/`master`; it does not run on
 `develop`.
 
@@ -103,6 +112,14 @@ workflow runs lint, type-check, and build on `main`/`master`; it does not run on
 | `/dashboard` | Saved events, publish/share/download, and RSVP filters |
 | `/signin` | Connected Mode sign-in/sign-up; Demo Mode setup guidance |
 | `/invite/:slug` | Public invitation and RSVP form (outside the app shell) |
+| `/events` | Managed events (organizer + assigned staff) |
+| `/events/create`, `/events/:eventId/edit` | Multi-step event wizard |
+| `/events/:eventId/manage` | Event dashboard: publish, share, staff, stats |
+| `/events/:eventId/guests`, `/events/:eventId/passes` | Guest list, CSV import, pass sharing |
+| `/events/:eventId/check-in` | Mobile-first QR / search / pass-ID check-in |
+| `/events/:eventId/attendance` | Live attendance dashboard |
+| `/events/:slug` | Public event page (outside the app shell) |
+| `/pass/:token` | A guest's personal pass (outside the app shell) |
 
 Legacy `/#/...` links are migrated to path-based routes by `src/main.tsx`.
 
@@ -148,6 +165,7 @@ with explicit fallbacks.
 | `og-invite` | Server-rendered crawler metadata | Requires a CDN/bot rewrite; not called by the SPA |
 | `whatsapp-send` | WhatsApp Cloud API delivery | Used only with `VITE_MESSAGING_MODE=cloud` |
 | `whatsapp-webhook` | Meta delivery-status webhook | External webhook endpoint |
+| `event-management` | Managed events, guests, passes, check-in, attendance | Used for all `/events` and `/pass` routes (no PostgREST fallback) |
 
 **Invariants**
 
@@ -185,6 +203,7 @@ VITE_MESSAGING_MODE=            # unset | wa_me | cloud | demo
 VITE_PUBLIC_SITE_URL=https://invana.stream
 VITE_REQUIRE_SIGN_IN=true       # Download gate in Connected Mode
 VITE_GA_MEASUREMENT_ID=         # optional GA4
+VITE_EVENT_MAX_CAPACITY=10000   # UI capacity cap; keep equal to the EM_MAX_CAPACITY function secret
 ```
 
 ---
@@ -192,9 +211,11 @@ VITE_GA_MEASUREMENT_ID=         # optional GA4
 ## Enable Connected Mode
 
 1. Create a Supabase project.
-2. Apply all five migrations in filename order — see [supabase/README.md](supabase/README.md).
+2. Apply all six migrations in filename order — see [supabase/README.md](supabase/README.md).
 3. Deploy `invite`, `rsvp`, and `media` for the frontend’s primary Edge paths.
-   Deploy `events`, `og-invite`, and `whatsapp-*` only for those optional capabilities.
+   Deploy `event-management` for `/events` (required — it is the only write path for
+   managed events). Deploy `events`, `og-invite`, and `whatsapp-*` only for those
+   optional capabilities.
 4. Enable the Supabase Email provider for email/password auth.
    If email confirmation is enabled, users must confirm before the first session.
 5. Set `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (+ `VITE_PUBLIC_SITE_URL`).
@@ -222,6 +243,39 @@ PostgREST, while media upload falls back to direct Storage.
 
 Existing Supabase projects should apply
 `supabase/migrations/20260327000000_media_2mb.sql`.
+
+## Event Management, Digital Pass & Attendance
+
+Organizer journey: **Create Event → Add Guests → Generate Passes → Review →
+Publish → Share → Guest Opens Pass → Staff Scans QR → Attendance Recorded →
+Organizer Monitors Attendance.**
+
+- **Data:** namespaced `em_*` tables (`em_events`, `em_event_timeline`,
+  `em_event_guests`, `em_event_passes`, `em_attendance`, `em_event_staff`,
+  `em_audit_log`) so invitation `events` / `event_guests` / `rsvps` are
+  untouched. A managed event can reference an invitation via `invite_event_id`.
+- **One domain core** in `supabase/functions/_shared/event-core/` (validation,
+  secure IDs/tokens, QR payload, CSV import, status transitions, authorization,
+  rate limits, audit, HTTP router). The `event-management` Edge Function wires it
+  to Postgres (service role); Demo Mode runs the same router in-browser over
+  localStorage; Vitest API tests exercise the same router.
+- **Passes:** UUID primary keys internally; display IDs like
+  `INV-EVT-2026-7KQ2MX` / `INV-PASS-8F72A91C` are random (not sequential). Each
+  pass has a 256-bit token. The QR encodes only `{v, eventId, passToken}` — no PII.
+- **Check-in:** the server resolves the pass from the token, verifies it belongs
+  to the event being scanned, checks event and pass status, and records
+  attendance atomically (`em_record_check_in`, one `CHECK_IN` per pass;
+  `RE_ENTRY` rows are modelled for later). Duplicate scans return the original
+  time.
+- **Access:** organizers own their events; staff are added per event by email
+  (bound to their account on first sign-in with a confirmed email) and can only
+  scan, search with masked contact details, and record attendance. Guests reach
+  only their own pass via its unguessable link.
+- **Rate limits + audit:** atomic Postgres limiter (`em_rate_limit_hit`,
+  fail-closed) on check-in, staff search, and public pass/event reads; every
+  mutation and check-in attempt is written to append-only `em_audit_log`.
+- **Maps:** OpenStreetMap tiles + Nominatim search behind `src/lib/maps.ts`
+  (`MapProvider`), no SDK or key. "Open in Maps" deep-links to Google Maps.
 
 ## Data model: shipped vs scaffolded
 
@@ -251,9 +305,14 @@ src/
   pages/                Route-level pages
   services/             Demo and Supabase adapters
   services/api/         Edge Function clients
+  services/eventManagement/  Event Management client (Edge / in-browser Demo transport) + API tests
+  pages/events/         Event Management pages
   templates/            Template registry, fields, and layout factory
 supabase/
   functions/            Logical APIs and WhatsApp functions
+  functions/_shared/event-core/  Runtime-agnostic Event Management domain + router
+  tests/                Local migration assertions and Edge integration runner
+e2e/                    Playwright specs (Demo Mode, fake camera QR scans)
   migrations/           Schema, RLS, Storage, and Phase 1 migrations
 docs/                   Architecture, deployment, and WhatsApp docs
 ```

@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_REQUIRE_SIGN_IN?: string;
   /** Google Analytics 4 measurement ID (G-XXXXXXXX). Leave unset to disable analytics. */
   readonly VITE_GA_MEASUREMENT_ID?: string;
+  /** Event Management capacity cap in the UI; mirror of the EM_MAX_CAPACITY Edge secret. */
+  readonly VITE_EVENT_MAX_CAPACITY?: string;
 }
 
 interface ImportMeta {

@@ -232,7 +232,7 @@ describe("pass API", () => {
 
   it("rate-limits pass enumeration", async () => {
     let last = 0;
-    for (let i = 0; i < 20; i += 1) last = (await call(null, "GET", `/public/passes/${secureToken()}`, undefined, "9.9.9.9")).status;
+    for (let i = 0; i < 25; i += 1) last = (await call(null, "GET", `/public/passes/${secureToken()}`, undefined, "9.9.9.9")).status;
     expect(last).toBe(429);
   });
 

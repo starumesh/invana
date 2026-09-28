@@ -16,6 +16,14 @@ Apply **in order** (SQL editor or `supabase db push`):
 | 3 | `migrations/20260324000002_storage.sql` | `event-media` bucket + policies |
 | 4 | `migrations/20260326000000_phase1_api.sql` | `api_rate_buckets` + `outbox_events` |
 | 5 | `migrations/20260327000000_media_2mb.sql` | Tighten existing `event-media` buckets to 2 MB |
+| 6 | `migrations/20260928000000_event_management.sql` | Event Management `em_*` tables, RLS, check-in + rate-limit RPCs |
+
+Verify locally without a Supabase project (vanilla Postgres 14+ with `psql`):
+
+```bash
+npm run test:db     # applies migrations (storage ones skipped) twice + SQL assertions
+npm run test:edge   # + PostgREST + Deno: runs the event-management repository end to end
+```
 
 ---
 
@@ -54,6 +62,13 @@ Object path: `{user_id}/{event_id}/{filename}`.
 | `message_campaigns` / `message_recipients` / `message_logs` | WhatsApp Cloud tracking |
 | `api_rate_buckets` | Public Edge rate-limit counters (service role) |
 | `outbox_events` | Async hooks (e.g. `rsvp.created`) — no consumer in V1 |
+| `em_events` | Managed events (UUID id, random `public_id`, `slug` on publish, DRAFT/PUBLISHED/CANCELLED/COMPLETED) |
+| `em_event_timeline` | Ordered schedule entries (`end_time > start_time`) |
+| `em_event_guests` | Guests per managed event; unique active email/phone; capacity trigger |
+| `em_event_passes` | One pass per guest; unique `public_id` + 256-bit `secure_token`; FK pins pass to the guest's event |
+| `em_attendance` | Check-ins; one `CHECK_IN` per pass (`RE_ENTRY` reserved) |
+| `em_event_staff` | Per-event door staff by email → `user_id` on first sign-in |
+| `em_audit_log` | Append-only audit trail (mutations + every check-in attempt) |
 
 ---
 
@@ -65,6 +80,10 @@ Object path: `{user_id}/{event_id}/{filename}`.
 - Hosts: **SELECT** RSVPs for their events.  
 - `api_rate_buckets` / `outbox_events`: service role only.  
 - Secrets (WhatsApp, service role) live only in Edge Functions.
+- `em_*`: **read-only** for authenticated organizers (own events) and assigned staff
+  (event row + timeline only — never guests or passes). No client writes, no anon
+  access; `em_record_check_in` / `em_rate_limit_hit` are `service_role` only. All
+  writes go through the `event-management` function, which enforces authorization.
 
 ---
 
@@ -78,9 +97,11 @@ Object path: `{user_id}/{event_id}/{filename}`.
 | `events` | `supabase functions deploy events` | Publish / unpublish + durable-media check |
 | `og-invite` | `supabase functions deploy og-invite` | OG HTML for crawlers |
 | `whatsapp-send` | `supabase functions deploy whatsapp-send` | Cloud API send |
+| `event-management` | `supabase functions deploy event-management` | Managed events, guests, passes, check-in, attendance (JWT + public routes) |
 | `whatsapp-webhook` | `supabase functions deploy whatsapp-webhook --no-verify-jwt` | Meta webhooks |
 
 Shared helpers: `functions/_shared/` (CORS, `x-request-id`, rate limit, slug, invite projection).
+Event Management domain + router: `functions/_shared/event-core/` (also imported by the SPA via `@event-core`).
 
 ### Deploy Phase 1 set
 
@@ -91,6 +112,20 @@ supabase functions deploy media
 supabase functions deploy events
 supabase functions deploy og-invite
 ```
+
+### Deploy Event Management
+
+```bash
+supabase db push                                  # or run 20260928000000_event_management.sql in the SQL editor
+supabase functions deploy event-management        # default verify_jwt: anon key works for public routes
+supabase secrets set EM_MAX_CAPACITY=10000        # optional; mirror in VITE_EVENT_MAX_CAPACITY
+supabase secrets set EM_PASS_BATCH_SIZE=50        # optional; passes per generate request
+```
+
+Staff access binds by **confirmed** email — keep email confirmation enabled in
+Auth settings, otherwise someone could sign up with a staff address. Rate limits
+fail **closed** if `em_rate_limit_hit` is missing, so apply the migration before
+deploying the function.
 
 ### Secrets
 

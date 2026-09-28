@@ -56,9 +56,11 @@ const RATE = {
   checkIn: { limit: 240, windowSeconds: 60 },
   checkInFailures: { limit: 40, windowSeconds: 60 },
   staffSearch: { limit: 90, windowSeconds: 60 },
-  publicPass: { limit: 60, windowSeconds: 60 },
-  publicPassMisses: { limit: 15, windowSeconds: 300 },
-  publicEvent: { limit: 120, windowSeconds: 60 },
+  // Per-IP reads are generous (guests at a venue often share one NAT); unknown-token
+  // misses are what anti-enumeration throttles.
+  publicPass: { limit: 300, windowSeconds: 60 },
+  publicPassMisses: { limit: 20, windowSeconds: 300 },
+  publicEvent: { limit: 300, windowSeconds: 60 },
 } as const;
 
 const CHECK_IN_COPY = {

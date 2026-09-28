@@ -107,6 +107,7 @@ supabase/
 | **Media** | Upload, metadata, URL policy | Sync upload | `event_media` + bucket | `media` |
 | **Messaging** | Cloud send, webhooks | Sync enqueue; async send | `message_*` | `whatsapp-send`, `whatsapp-webhook` |
 | **OG** | Crawler HTML shell | Sync | — | `og-invite` |
+| **Event Management** | Managed events, guests, passes, check-in, attendance, staff, audit | Sync (pass generation batched by the client) | `em_*` tables | `event-management` |
 | **Jobs** | Bulk send, email, OG/export | Async | `outbox_events` / queue | *(consumer later)* |
 | **Export** | Server PNG/PDF *(optional)* | Async | `exports` | Client `lib/export.ts` today |
 
@@ -128,6 +129,12 @@ Mapped to `/functions/v1/<name>` today. Treat these as the product API for futur
 - `GET /v1/invites/{slug}` → published projection  
 - `POST /v1/invites/{slug}/rsvps` → insert only  
 - Media via public bucket / CDN  
+
+**Event Management** (`/functions/v1/event-management/…`; router in `_shared/event-core/router.ts`)
+
+- Public (anon, rate-limited, no PII): `GET /public/events/{slug}` · `GET /public/passes/{token}`
+- Organizer (JWT): `GET|POST /events` · `GET|PATCH /events/{id}` · `POST /events/{id}/(publish|unpublish|cancel|complete)` · `POST /events/{id}/guests` · `PATCH|DELETE /events/{id}/guests/{guestId}` · `POST …/guests/{guestId}/share` · `POST /events/{id}/passes/generate` · `GET …/passes/export` · `POST …/passes/{passId}/(cancel|reissue)` · `GET /events/{id}/attendance` · `GET|POST|DELETE /events/{id}/staff…`
+- Organizer or assigned staff (JWT): `GET|POST /events/{id}/check-in` · `GET /events/{id}/check-in/search?q=`
 
 **System**
 
@@ -191,10 +198,20 @@ flowchart LR
 | Media object + metadata | Media | Events stores URL strings in `config` |
 | RSVP (+ answers) | RSVP | Events does not embed RSVP arrays |
 | Campaigns / logs | Messaging | References `event_id`, `guest_id` |
+| Managed event, guests, passes, attendance, staff, audit (`em_*`) | Event Management | Optional `invite_event_id` → invitation `events`; nothing else writes `em_*` |
 
 No dual SoR for the same RSVP or the same media bytes.
 
 ---
+
+## Event Management
+
+- **Namespaced model.** `em_*` tables sit beside the invitation `events` (text id + `RenderInput` config) instead of overloading it; invite/RSVP flows are unchanged.
+- **One domain core, three transports.** `supabase/functions/_shared/event-core/` holds validation, IDs/tokens, QR payload, status transitions, authorization, rate-limit and audit calls, and the HTTP router. It is runtime-agnostic (Web Crypto + Intl only). The Edge function binds it to a service-role Postgres repository; Demo Mode binds it to a localStorage-backed in-memory repository in the browser; Vitest binds it to the in-memory repository.
+- **Trust boundary.** Actor comes only from the verified JWT. Client-supplied event/pass/guest ids, roles, and statuses are never trusted: check-in resolves the pass from its token, compares `pass.event_id` with the event being scanned, and re-reads status. Unknown and not-owned events return the same 403 (anti-enumeration).
+- **Atomicity.** `em_record_check_in` flips `ISSUED → CHECKED_IN` under a row lock and inserts the single `CHECK_IN` attendance row; a partial unique index backs it. Capacity is enforced by the service and a `FOR UPDATE` trigger.
+- **Near-real-time attendance.** Dashboard polls every 5 s while visible (and reacts to cross-tab `storage` events in Demo Mode). Supabase Realtime is a later option.
+- **Bulk passes.** Client loops `POST …/passes/generate` in batches (default 25–50) and renders "87 / 100 generated"; a server-side job queue is deferred.
 
 ## Observability
 
