@@ -9,6 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      "@event-core": path.resolve(__dirname, "supabase/functions/_shared/event-core"),
     },
   },
   build: {
@@ -18,5 +19,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    exclude: ["e2e/**", "node_modules/**"],
   },
 });

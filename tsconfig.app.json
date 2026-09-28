@@ -21,8 +21,10 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@event-core": ["supabase/functions/_shared/event-core/index.ts"],
+      "@event-core/*": ["supabase/functions/_shared/event-core/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "supabase/functions/_shared/event-core"]
 }
