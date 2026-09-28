@@ -15,6 +15,7 @@ Apply **in order** (SQL editor or `supabase db push`):
 | 2 | `migrations/20260324000001_rls.sql` | Row Level Security |
 | 3 | `migrations/20260324000002_storage.sql` | `event-media` bucket + policies |
 | 4 | `migrations/20260326000000_phase1_api.sql` | `api_rate_buckets` + `outbox_events` |
+| 5 | `migrations/20260327000000_media_2mb.sql` | Tighten existing `event-media` buckets to 2 MB |
 
 ---
 
@@ -113,7 +114,7 @@ Until functions are deployed, the SPA falls back to PostgREST for invite GET / R
 
 ## Verify
 
-1. Migrations 1–4 applied; bucket public.  
+1. Migrations 1–5 applied; bucket public.
 2. Phase 1 functions deployed.  
 3. Frontend Connected env set; `npm run dev` / production host rebuilt.  
 4. Sign in → upload photo → Save → object under `event-media/{uid}/…` → Download PNG includes photo.  

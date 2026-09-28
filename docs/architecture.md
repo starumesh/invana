@@ -50,7 +50,7 @@ Static SPA (Netlify / Vercel / Cloudflare). Browser never holds WhatsApp tokens 
 | Interface | Demo Mode | Connected Mode |
 |-----------|-----------|----------------|
 | `PersistenceProvider` | `localStorage` | PostgREST `events` / `rsvps` (host CRUD) |
-| `AuthProvider` | local demo user | Supabase Auth (magic link) |
+| `AuthProvider` | local demo user | Supabase Auth (email/password) |
 | `MessagingProvider` | `wa.me` | `wa.me` default; Cloud API when `VITE_MESSAGING_MODE=cloud` |
 | `StorageProvider` | durable data URLs | Media Edge (preferred) or Storage `event-media`; promote on Save/claim |
 

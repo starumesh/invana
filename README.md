@@ -4,6 +4,11 @@ Invana is a mobile-first platform for creating premium digital invitations and
 bio cards, exporting print-ready PNG/PDF files, publishing RSVP websites, and
 sharing invitations through WhatsApp.
 
+The current catalog contains **101 original templates**, **15 invitation event
+types**, **10 bio/card types**, and **6 client-side theme presets**.
+The npm package is currently named `event-invite-platform`; **Invana** is the
+user-facing product name.
+
 | Mode | Behavior |
 |------|----------|
 | **Demo** | Browser-local drafts/RSVPs, compressed data-URL photos, and `wa.me` shares; no backend required |
@@ -15,7 +20,7 @@ Production site: **https://invana.stream**
 
 ## What is implemented
 
-- Invitation and bio-card creation with configurable event/card types.
+- Invitation and bio-card creation across 15 event types and 10 card types.
 - Original, data-driven SVG templates with theme customization and live preview.
 - Photo slots with center cover-crop in builder, public invite, PNG, and PDF.
 - Client-side photo compression, a 2 MB stored-object limit, and long-lived CDN caching.
@@ -26,7 +31,8 @@ Production site: **https://invana.stream**
 - Guest draft/media promotion after sign-in.
 - Email/password sign-in and account creation through Supabase Auth.
 - WhatsApp `wa.me` sharing and optional WhatsApp Cloud API functions.
-- Phase 1 APIs for invite reads, RSVP writes, media, event publishing, and OG metadata.
+- Edge APIs for invite reads, RSVP writes, media, optional WhatsApp, event
+  publish/unpublish, and OG metadata (see the integration-status table below).
 - Row Level Security, owner-scoped Storage writes, request IDs, and rate limiting.
 
 ---
@@ -35,6 +41,7 @@ Production site: **https://invana.stream**
 
 - Node.js 20+ and npm
 - A Supabase project only for Connected Mode
+- Supabase CLI only when applying migrations/deploying functions from a terminal
 
 ## Run locally
 
@@ -45,7 +52,7 @@ npm install
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173/** (or the URL printed by Vite). For a fixed host:
+Open **http://localhost:5173/** (or the URL printed by Vite). For a fixed host:
 
 ```bash
 npm run dev -- --host 127.0.0.1 --port 5173
@@ -54,6 +61,9 @@ npm run dev -- --host 127.0.0.1 --port 5173
 Create local configuration with `cp .env.example .env`. Leave the two Supabase
 variables empty for Demo Mode. Never put service-role or WhatsApp secrets in
 `VITE_*`; Vite exposes those variables to the browser.
+
+Invana enters Connected Mode only when both `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY` are real, non-placeholder values.
 
 ## Commands
 
@@ -66,6 +76,10 @@ variables empty for Demo Mode. Never put service-role or WhatsApp secrets in
 | `npm run lint` | Run ESLint with zero warnings |
 | `npm test` | Run Vitest tests |
 
+There are currently **22 Vitest tests across 5 files**. The GitHub Pages
+workflow runs lint, type-check, and build on `main`/`master`; it does not run on
+`develop`.
+
 ---
 
 ## Product flow
@@ -77,6 +91,20 @@ variables empty for Demo Mode. Never put service-role or WhatsApp secrets in
 5. **Publish** — public `/invite/:slug` RSVP site  
 6. **Share** — WhatsApp (`wa.me` or Cloud API)  
 7. **RSVP** — guests respond; host sees them on **My events**
+
+### Routes
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Marketing home |
+| `/templates` | Browse the full template catalog |
+| `/create`, `/create/:eventType`, `/create/card` | Select invitation/card type and template |
+| `/builder/:id` | Edit content/theme, preview, save, and export |
+| `/dashboard` | Saved events, publish/share/download, and RSVP filters |
+| `/signin` | Connected Mode sign-in/sign-up; Demo Mode setup guidance |
+| `/invite/:slug` | Public invitation and RSVP form (outside the app shell) |
+
+Legacy `/#/...` links are migrated to path-based routes by `src/main.tsx`.
 
 ---
 
@@ -95,18 +123,31 @@ RenderInput (fields + templateId + theme)
 
 ```mermaid
 flowchart LR
-  Host[Host SPA] --> Edge[Supabase Edge APIs]
+  Host[Host SPA] --> Auth[Supabase Auth]
+  Host --> DB[(Postgres + RLS)]
+  Host --> Edge[Supabase Edge APIs]
   Guest[Guest SPA] --> Edge
-  Edge --> Auth[Supabase Auth]
-  Edge --> DB[(Postgres + RLS)]
+  Edge --> DB
   Edge --> Storage[(event-media Storage)]
   Edge --> WhatsApp[WhatsApp Cloud API]
 ```
 
-Connected Mode uses the Phase 1 services `invite`, `rsvp`, `media`, `events`,
-and `og-invite`, plus optional WhatsApp functions. The frontend keeps provider
-contracts: `PersistenceProvider`, `StorageProvider`, `AuthProvider`, and
-`MessagingProvider`.
+The frontend keeps `PersistenceProvider`, `StorageProvider`, `AuthProvider`,
+and `MessagingProvider` contracts. Host event persistence and RSVP dashboard
+reads currently use PostgREST; public and media paths prefer Edge Functions
+with explicit fallbacks.
+
+### Edge integration status
+
+| Function | Purpose | SPA integration |
+|----------|---------|-----------------|
+| `invite` | Public published invite read | Used; PostgREST fallback |
+| `rsvp` | Public RSVP write and host RSVP read | Public POST used; dashboard GET still uses PostgREST |
+| `media` | Authenticated media upload + metadata | Used; direct Storage fallback |
+| `events` | Publish/unpublish with durable-media validation | Deployed capability; SPA publish currently uses PostgREST |
+| `og-invite` | Server-rendered crawler metadata | Requires a CDN/bot rewrite; not called by the SPA |
+| `whatsapp-send` | WhatsApp Cloud API delivery | Used only with `VITE_MESSAGING_MODE=cloud` |
+| `whatsapp-webhook` | Meta delivery-status webhook | External webhook endpoint |
 
 **Invariants**
 
@@ -150,23 +191,26 @@ VITE_GA_MEASUREMENT_ID=         # optional GA4
 
 ## Enable Connected Mode
 
-1. Create a Supabase project.  
-2. Apply migrations in order — see [supabase/README.md](supabase/README.md).  
-3. Deploy Edge Functions: `invite`, `rsvp`, `media`, `events`, `og-invite` (+ WhatsApp if needed).  
+1. Create a Supabase project.
+2. Apply all five migrations in filename order — see [supabase/README.md](supabase/README.md).
+3. Deploy `invite`, `rsvp`, and `media` for the frontend’s primary Edge paths.
+   Deploy `events`, `og-invite`, and `whatsapp-*` only for those optional capabilities.
 4. Enable the Supabase Email provider for email/password auth.
-5. Set `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (+ `VITE_PUBLIC_SITE_URL`).  
-6. Restart `npm run dev` → adapters switch to Connected.  
-7. Sign in before cloud Save / Publish / Share.  
+   If email confirmation is enabled, users must confirm before the first session.
+5. Set `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (+ `VITE_PUBLIC_SITE_URL`).
+6. Restart `npm run dev`; adapters switch to Connected Mode.
+7. Sign in before cloud Save / Publish / Share.
 8. Optional: `VITE_MESSAGING_MODE=cloud` after [WhatsApp setup](docs/whatsapp.md).
 
-Until Edge Functions are deployed, the SPA falls back to PostgREST / direct Storage for invite, RSVP, and uploads.
+Without those Edge Functions, public invite reads and RSVP writes fall back to
+PostgREST, while media upload falls back to direct Storage.
 
 ---
 
 ## Supabase media behavior
 
 - Public-read bucket: `event-media`.
-- Object path: `{userId}/{eventId}/{mediaId}.{ext}`.
+- Object path: `{userId}/{eventId}/media_*.{ext}`.
 - JPEG, PNG, WebP, and GIF inputs are downsized and generally encoded to
   WebP/JPEG before upload.
 - Stored objects are capped at 2 MB by client preparation, Media Edge, and the
@@ -177,7 +221,23 @@ Until Edge Functions are deployed, the SPA falls back to PostgREST / direct Stor
   the same durable URL.
 
 Existing Supabase projects should apply
-`supabase/migrations/20260326000001_media_2mb.sql`.
+`supabase/migrations/20260327000000_media_2mb.sql`.
+
+## Data model: shipped vs scaffolded
+
+Used by current product flows:
+
+- `profiles` — auth-linked user profile.
+- `events` — draft/published event plus canonical `RenderInput` JSON.
+- `rsvps` — public responses and host dashboard reads.
+- `event_media` + `event-media` Storage — media metadata and bytes.
+- `api_rate_buckets` and `outbox_events` — Edge rate limits and RSVP outbox
+  records (there is no outbox consumer yet).
+
+The schema also includes `event_guests`, custom RSVP questions/answers,
+`exports`, persisted `themes`, and WhatsApp campaign/log tables. These are
+foundations for future product flows; they do not currently have complete UI
+workflows. PNG/PDF export is client-side and does not write `exports`.
 
 ## Repository layout
 
@@ -200,13 +260,28 @@ docs/                   Architecture, deployment, and WhatsApp docs
 
 ---
 
+## Current limitations
+
+- Custom RSVP questions, guest-list management, saved DB themes, export history,
+  and bulk campaign management are schema foundations, not finished UI flows.
+- The SPA publishes events through PostgREST; the `events` Edge publish API is
+  available but not wired into the frontend.
+- The dashboard reads RSVPs through PostgREST; the Edge host-GET path is not used.
+- `og-invite` requires a CDN/bot rewrite before social crawlers receive its HTML.
+- Dynamic invitation URLs are not generated into the static sitemap.
+- WhatsApp webhook tracking expects recipient rows/provider IDs; the current
+  direct send path does not build a full campaign history.
+
+---
+
 ## Hosting
 
 | Target | Notes |
 |--------|--------|
 | **Netlify** (production) | https://invana.stream — SPA fallback in `netlify.toml` |
 | **Vercel** | `vercel.json` rewrites — [docs/deployment.md](docs/deployment.md) |
-| **GitHub Pages** | Legacy; hash links migrate to path URLs |
+| **GitHub Pages** | Legacy workflow on `main`/`master`; hash links migrate to path URLs |
+| **Cloudflare Pages** | Documented setup only; no Cloudflare config file is committed |
 
 App uses **BrowserRouter** (`/invite/:slug`). Old `/#/invite/...` links are redirected.
 
@@ -219,7 +294,7 @@ App uses **BrowserRouter** (`/invite/:slug`). Old `/#/invite/...` links are redi
 | UI | React 18, TypeScript 5, Tailwind CSS 3 |
 | Build | Vite 5 |
 | Routing | React Router 6 (`BrowserRouter`) |
-| Forms/state | React Hook Form, Zod, Zustand |
+| Validation/state | Zod and React state/context |
 | Rendering/export | SVG compositions, Canvas, jsPDF, qrcode |
 | Backend | Supabase Auth, Postgres, RLS, Storage, Edge Functions |
 | Messaging | WhatsApp `wa.me` and optional WhatsApp Cloud API |
