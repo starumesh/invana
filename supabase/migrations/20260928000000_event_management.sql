@@ -254,7 +254,9 @@ create trigger em_event_guests_capacity
 -- ---------------------------------------------------------------------------
 -- Aggregates for dashboards
 -- ---------------------------------------------------------------------------
-create or replace view public.em_event_counts
+-- Dropped first so re-running this file after later migrations (which add columns) works.
+drop view if exists public.em_event_counts;
+create view public.em_event_counts
 with (security_invoker = true)
 as
 select

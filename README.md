@@ -210,7 +210,7 @@ VITE_EVENT_MAX_CAPACITY=10000   # UI capacity cap; keep equal to the EM_MAX_CAPA
 ## Enable Connected Mode
 
 1. Create a Supabase project.
-2. Apply all seven migrations in filename order — see [supabase/README.md](supabase/README.md).
+2. Apply all eight migrations in filename order — see [supabase/README.md](supabase/README.md).
 3. Deploy `invite`, `rsvp`, and `media` for the frontend’s primary Edge paths.
    Deploy `event-management` for `/events` (required — it is the only write path for
    managed events). Deploy `events`, `og-invite`, and `whatsapp-*` only for those

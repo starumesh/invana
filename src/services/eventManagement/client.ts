@@ -5,7 +5,11 @@ import {
   type EventDetail,
   type EventDetailsInput,
   type EventStats,
-  type EventSummary,
+  type EventListPage,
+  type EventOverview,
+  type GuestPage,
+  type GuestQuery,
+  type GuestRow,
   type FieldErrors,
   type Guest,
   type GuestInput,
@@ -77,8 +81,19 @@ function toApiError(status: number, payload: Record<string, unknown>): EmApiErro
 
 const enc = encodeURIComponent;
 
+function guestQueryString(q: GuestQuery): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== "" && v !== null) params.set(k, String(v));
+  return params.toString();
+}
+
 export const eventsApi = {
-  list: () => request<{ events: EventSummary[] }>("GET", "/events").then((r) => r.events),
+  list: (opts: { limit?: number; cursor?: string | null } = {}) =>
+    request<EventListPage>("GET", `/events?limit=${opts.limit ?? 24}${opts.cursor ? `&cursor=${enc(opts.cursor)}` : ""}`),
+  overview: (id: string) => request<EventOverview>("GET", `/events/${enc(id)}/overview`),
+  queryGuests: (id: string, query: GuestQuery) => request<GuestPage>("GET", `/events/${enc(id)}/guests?${guestQueryString(query)}`),
+  exportGuests: (id: string, query: GuestQuery) =>
+    request<{ rows: GuestRow[] }>("GET", `/events/${enc(id)}/guests/export?${guestQueryString(query)}`).then((r) => r.rows),
   create: (input: { details: EventDetailsInput; timeline?: TimelineInput[]; guests?: GuestInput[] }) =>
     request<EventDetail>("POST", "/events", input),
   get: (id: string) => request<EventDetail>("GET", `/events/${enc(id)}`),
@@ -93,10 +108,12 @@ export const eventsApi = {
     request<{ guest: Guest }>("PATCH", `/events/${enc(id)}/guests/${enc(guestId)}`, guest).then((r) => r.guest),
   removeGuest: (id: string, guestId: string) =>
     request<{ removed: "DELETED" | "CANCELLED" }>("DELETE", `/events/${enc(id)}/guests/${enc(guestId)}`),
-  sharePass: (id: string, guestId: string) =>
-    request<{ passToken: string; passPublicId: string; guestName: string; phone: string; email: string }>(
+  /** `purpose: "share"` marks the pass as shared; "view" only fetches the private link. */
+  sharePass: (id: string, guestId: string, purpose: "view" | "share" = "view") =>
+    request<{ passToken: string; passPublicId: string; guestName: string; phone: string; email: string; sharedAt: string | null }>(
       "POST",
       `/events/${enc(id)}/guests/${enc(guestId)}/share`,
+      { purpose },
     ),
 
   generatePassesFor: (id: string, guestIds: string[]) =>
@@ -108,11 +125,6 @@ export const eventsApi = {
       pending: number;
       passes: { guestId: string; publicId: string; holderName: string; holderRole: string }[];
     }>("POST", `/events/${enc(id)}/passes/generate`, { guestIds }),
-  exportPasses: (id: string) =>
-    request<{ passes: { name: string; email: string; phone: string; role: string; passPublicId: string; passToken: string; status: string }[] }>(
-      "GET",
-      `/events/${enc(id)}/passes/export`,
-    ).then((r) => r.passes),
   cancelPass: (id: string, passId: string) =>
     request<{ pass: Omit<Pass, "secureToken"> }>("POST", `/events/${enc(id)}/passes/${enc(passId)}/cancel`),
   reissuePass: (id: string, passId: string) =>

@@ -21,7 +21,7 @@ cd "$(dirname "$0")/.."
 REF="${SUPABASE_PROJECT_REF:-innwdfxqqnookmwbsgjy}"
 export SUPABASE_ACCESS_TOKEN
 
-for f in supabase/migrations/20260928000000_event_management.sql supabase/migrations/20260929000000_em_pass_holder.sql; do
+for f in supabase/migrations/20260928000000_event_management.sql supabase/migrations/20260929000000_em_pass_holder.sql supabase/migrations/20260929010000_em_list_performance.sql; do
   echo "Applying $f"
   psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"
 done

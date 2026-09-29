@@ -21,6 +21,6 @@ for f in migrations/*.sql; do
     *) run "$f";;
   esac
 done
-# Idempotency: the event management migration must re-apply cleanly.
-run migrations/20260928000000_event_management.sql
+# Idempotency: the event management migrations must re-apply cleanly, in order.
+for f in migrations/2026092*_e*.sql; do run "$f"; done
 psql "$DB_URL" -q -v ON_ERROR_STOP=1 -f tests/event_management_test.sql

@@ -151,7 +151,7 @@ export function metaForPath(pathname: string): PageMeta {
 
   if (path === "/dashboard") {
     return {
-      title: `My Invitations | ${SITE_NAME}`,
+      title: `My Designs | ${SITE_NAME}`,
       description:
         "Manage your digital invitations, biodata cards, RSVPs, and WhatsApp invite shares in one place.",
       keywords: DEFAULT_KEYWORDS,
@@ -179,7 +179,7 @@ export function metaForPath(pathname: string): PageMeta {
 
   if (path === "/events" || /^\/events\/(create|[^/]+\/[^/]+)$/.test(path)) {
     return {
-      title: `Events | ${SITE_NAME}`,
+      title: `My Invitations | ${SITE_NAME}`,
       description: "Manage events, guest passes, check-in, and attendance.",
       keywords: DEFAULT_KEYWORDS,
       noIndex: true,

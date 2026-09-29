@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { formatEventTime, type GuestPassView } from "@event-core";
 import { PassCard } from "@/components/events/PassCard";
 import { CalendarActions } from "@/components/events/ShareActions";
@@ -13,6 +13,8 @@ import { errorMessage, eventsApi } from "@/services/eventManagement/client";
 
 export function GuestPassPage() {
   const { token = "" } = useParams();
+  const location = useLocation();
+  const back = location.state as { from?: string; fromLabel?: string } | null;
   const [view, setView] = useState<GuestPassView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("");
@@ -45,6 +47,11 @@ export function GuestPassPage() {
   return (
     <main className="min-h-screen bg-cream-dark/60 px-4 py-6 print:bg-white print:p-0">
       <div className="mx-auto max-w-sm">
+        {back?.from ? (
+          <Link to={back.from} className="mb-4 inline-block text-sm text-ink-muted hover:text-ink print:hidden">
+            ← {back.fromLabel ?? "Back"}
+          </Link>
+        ) : null}
         {view.pass.status === "CHECKED_IN" && view.pass.checkedInAt ? (
           <p className="mb-4 rounded-2xl bg-emerald-50 px-4 py-3 text-center text-sm text-emerald-900 print:hidden" role="status">
             You checked in at {formatEventTime(view.pass.checkedInAt, e.timezone)}. Enjoy the event!

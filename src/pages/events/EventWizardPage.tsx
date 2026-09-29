@@ -500,7 +500,7 @@ export function EventWizardPage() {
             >
               Start over
             </button>
-            {draft.eventId ? " (the saved draft stays under Events)" : ""}
+            {draft.eventId ? " (the saved draft stays in My Invitations)" : ""}
           </Notice>
         </div>
       ) : null}

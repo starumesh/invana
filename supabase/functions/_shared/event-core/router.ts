@@ -11,12 +11,15 @@ import type { AttendanceFilter, RequestContext } from "./types.ts";
  *   GET    /public/events/:slug
  *   GET    /public/passes/:token
  * Organizer (JWT):
- *   GET    /events                         POST /events
+ *   GET    /events?limit=&cursor=          POST /events
  *   GET    /events/:id                     PATCH /events/:id
+ *   GET    /events/:id/overview            (event + timeline + counts, no guest rows)
+ *   GET    /events/:id/guests?q=&filter=&role=&sort=&dir=&limit=&offset=
+ *   GET    /events/:id/guests/export?q=&filter=&role=&sort=&dir=
  *   POST   /events/:id/(publish|unpublish|cancel|complete)
  *   POST   /events/:id/guests              PATCH|DELETE /events/:id/guests/:guestId
- *   POST   /events/:id/guests/:guestId/share
- *   POST   /events/:id/passes/generate     GET /events/:id/passes/export
+ *   POST   /events/:id/guests/:guestId/share  { purpose: "view" | "share" }
+ *   POST   /events/:id/passes/generate
  *   POST   /events/:id/passes/:passId/(cancel|reissue)
  *   GET    /events/:id/attendance?filter=&q=
  *   GET|POST /events/:id/staff             DELETE /events/:id/staff/:staffId
@@ -75,7 +78,9 @@ export async function handleEventRequest(service: EventService, req: Request, ct
     if (p[0] !== "events") return respond({ error: "Not found." }, 404);
 
     if (p.length === 1) {
-      if (m === "GET") return respond({ events: await service.listMyEvents(ctx) });
+      if (m === "GET") {
+        return respond(await service.listMyEvents(ctx, { limit: url.searchParams.get("limit"), cursor: url.searchParams.get("cursor") }));
+      }
       if (m === "POST") {
         const body = await readBody(req);
         const detail = await service.createEvent(ctx, {
@@ -99,12 +104,24 @@ export async function handleEventRequest(service: EventService, req: Request, ct
     }
 
     const section = p[2];
+    if (section === "overview" && p.length === 3 && m === "GET") return respond(await service.getEventOverview(ctx, id));
+    const guestQuery = () => ({
+      q: url.searchParams.get("q") ?? "",
+      filter: (url.searchParams.get("filter") ?? "ALL").toUpperCase() as never,
+      role: (url.searchParams.get("role") ?? "ALL").toUpperCase() as never,
+      sort: (url.searchParams.get("sort") ?? "created") as never,
+      dir: (url.searchParams.get("dir") ?? "asc") as never,
+      limit: Number(url.searchParams.get("limit")) || undefined,
+      offset: Number(url.searchParams.get("offset")) || undefined,
+    });
     if (p.length === 3 && m === "POST" && section in TRANSITIONS) {
       const to = TRANSITIONS[section as keyof typeof TRANSITIONS];
       return respond({ event: await service.transitionEvent(ctx, id, to) });
     }
 
     if (section === "guests") {
+      if (p.length === 3 && m === "GET") return respond(await service.queryGuests(ctx, id, guestQuery()));
+      if (p[3] === "export" && p.length === 4 && m === "GET") return respond({ rows: await service.exportGuests(ctx, id, guestQuery()) });
       if (p.length === 3 && m === "POST") {
         const body = await readBody(req);
         return respond({ guests: await service.addGuests(ctx, id, (body.guests ?? []) as never) }, 201);
@@ -114,7 +131,10 @@ export async function handleEventRequest(service: EventService, req: Request, ct
         return respond({ guest: await service.updateGuest(ctx, id, guestId, (await readBody(req)) as never) });
       }
       if (guestId && p.length === 4 && m === "DELETE") return respond(await service.removeGuest(ctx, id, guestId));
-      if (guestId && p[4] === "share" && m === "POST") return respond(await service.sharePass(ctx, id, guestId));
+      if (guestId && p[4] === "share" && m === "POST") {
+        const body = await readBody(req);
+        return respond(await service.sharePass(ctx, id, guestId, { purpose: body.purpose }));
+      }
     }
 
     if (section === "passes") {
@@ -124,7 +144,6 @@ export async function handleEventRequest(service: EventService, req: Request, ct
           await service.generatePasses(ctx, id, { guestIds: body.guestIds, batchSize: Number(body.batchSize) || undefined }),
         );
       }
-      if (p[3] === "export" && m === "GET") return respond({ passes: await service.exportPassLinks(ctx, id) });
       const passId = p[3];
       if (passId && p[4] === "cancel" && m === "POST") return respond({ pass: redactPass(await service.cancelPass(ctx, id, passId)) });
       if (passId && p[4] === "reissue" && m === "POST") return respond({ pass: redactPass(await service.reissuePass(ctx, id, passId)) });

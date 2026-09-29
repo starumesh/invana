@@ -1,7 +1,8 @@
 import { EventError, MESSAGES } from "./errors.ts";
-import { UniqueViolation, type CheckInWrite, type CheckInWriteResult, type EventRepository, type RawEventCounts } from "./repository.ts";
-import { countsFrom } from "./service.ts";
-import type { Attendance, AuditEntry, Guest, ManagedEvent, Pass, StaffAssignment, TimelineItem } from "./types.ts";
+import { UniqueViolation, type CheckInWrite, type EventCursor, type CheckInWriteResult, type EventRepository, type RawEventCounts } from "./repository.ts";
+import { applyGuestQuery } from "./guestQuery.ts";
+import { countsFrom, guestStage, passView } from "./service.ts";
+import type { Attendance, AuditEntry, EventListItem, GuestQuery, GuestRow, Guest, ManagedEvent, Pass, StaffAssignment, TimelineItem } from "./types.ts";
 
 export type MemorySnapshot = {
   events: ManagedEvent[];
@@ -91,6 +92,37 @@ export class MemoryEventRepository implements EventRepository {
       );
     }
     return out;
+  }
+
+  async listEventSummaries(input: { userId: string; email: string | null; limit: number; cursor: EventCursor | null }) {
+    const staffOf = new Set(
+      this.data.staff.filter((s) => s.userId === input.userId || (!s.userId && input.email && s.email === input.email)).map((s) => s.eventId),
+    );
+    const rows = this.data.events
+      .map((e) => ({ e, access: e.createdBy === input.userId ? ("ORGANIZER" as const) : staffOf.has(e.id) && e.status !== "DRAFT" ? ("STAFF" as const) : null }))
+      .filter((r): r is { e: (typeof r)["e"]; access: "ORGANIZER" | "STAFF" } => r.access !== null)
+      .sort((a, b) => b.e.createdAt.localeCompare(a.e.createdAt) || b.e.id.localeCompare(a.e.id))
+      .filter(({ e }) => !input.cursor || e.createdAt < input.cursor.createdAt || (e.createdAt === input.cursor.createdAt && e.id < input.cursor.id))
+      .slice(0, input.limit);
+    return rows.map(({ e, access }) => {
+      const event: EventListItem = {
+        id: e.id, publicId: e.publicId, name: e.name, eventType: e.eventType, startDatetime: e.startDatetime, timezone: e.timezone,
+        durationMinutes: e.durationMinutes, venueName: e.venueName, city: e.city, status: e.status, slug: e.slug, maxCapacity: e.maxCapacity, createdAt: e.createdAt,
+      };
+      const counts = countsFrom(this.data.guests.filter((g) => g.eventId === e.id), this.data.passes.filter((p) => p.eventId === e.id));
+      return { event: clone(event), counts, access };
+    });
+  }
+
+  async queryGuestRows(eventId: string, query: Required<Omit<GuestQuery, "role">> & { role: GuestQuery["role"] }) {
+    const passes = new Map(this.data.passes.filter((p) => p.eventId === eventId).map((p) => [p.guestId, p]));
+    const all: GuestRow[] = this.data.guests
+      .filter((g) => g.eventId === eventId)
+      .map((g) => {
+        const p = passes.get(g.id);
+        return { ...clone(g), pass: p ? passView(p) : null, stage: guestStage(g, p) };
+      });
+    return applyGuestQuery(all, query);
   }
 
   async listStaff(eventId: string) {

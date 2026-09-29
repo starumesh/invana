@@ -1,7 +1,8 @@
 import { EventError, MESSAGES, type FieldErrors } from "./errors.ts";
 import { eventPublicId, eventSlug, normalizePassPublicId, passPublicId, RESERVED_SLUGS, secureToken, slugify, uuid } from "./ids.ts";
 import { decodeQrPayload, encodeQrPayload, isUuid } from "./qrPayload.ts";
-import { UniqueViolation, type EventRepository, type RawEventCounts } from "./repository.ts";
+import { UniqueViolation, type EventCursor, type EventRepository, type RawEventCounts } from "./repository.ts";
+import { GUEST_ROLES } from "./types.ts";
 import { acceptsCheckIn, canTransitionEvent, canTransitionPass, isEditable } from "./status.ts";
 import type {
   Actor,
@@ -12,12 +13,19 @@ import type {
   EventDetail,
   EventDetailsInput,
   EventStats,
+  EventListPage,
+  EventOverview,
   EventStatus,
-  EventSummary,
   Guest,
   GuestInput,
+  GuestFilter,
+  GuestPage,
   GuestPassView,
+  GuestQuery,
   GuestRole,
+  GuestRow,
+  GuestSort,
+  GuestStage,
   GuestWithPass,
   ManagedEvent,
   Pass,
@@ -90,8 +98,8 @@ function maskPhone(phone: string): string {
   return digits ? `•••• ${digits.slice(-4)}` : "";
 }
 
-function statsFrom(event: ManagedEvent, counts: RawEventCounts | undefined): EventStats {
-  const c = counts ?? { invited: 0, cancelled: 0, checkedIn: 0, passesIssued: 0 };
+function statsFrom(event: { maxCapacity: number }, counts: RawEventCounts | undefined): EventStats {
+  const c = counts ?? { invited: 0, cancelled: 0, checkedIn: 0, passesIssued: 0, passesShared: 0 };
   const active = c.invited;
   return {
     maxCapacity: event.maxCapacity,
@@ -101,6 +109,7 @@ function statsFrom(event: ManagedEvent, counts: RawEventCounts | undefined): Eve
     cancelled: c.cancelled,
     passesIssued: c.passesIssued,
     passesPending: Math.max(0, active - c.passesIssued),
+    passesShared: c.passesShared ?? 0,
     attendancePercent: active ? Math.round((c.checkedIn / active) * 1000) / 10 : 0,
   };
 }
@@ -112,8 +121,48 @@ export function countsFrom(guests: Guest[], passes: Pass[]): RawEventCounts {
     cancelled: cancelledGuests.size,
     checkedIn: guests.filter((g) => g.status === "CHECKED_IN").length,
     passesIssued: passes.filter((p) => p.status !== "CANCELLED" && !cancelledGuests.has(p.guestId)).length,
+    passesShared: passes.filter((p) => p.status !== "CANCELLED" && p.sharedAt && !cancelledGuests.has(p.guestId)).length,
   };
 }
+
+export function guestStage(g: Pick<Guest, "status">, p: Pick<Pass, "status" | "sharedAt"> | null | undefined): GuestStage {
+  if (g.status === "CANCELLED") return "CANCELLED";
+  if (g.status === "CHECKED_IN" || p?.status === "CHECKED_IN") return "CHECKED_IN";
+  if (!p) return "NO_PASS";
+  if (p.status === "CANCELLED") return "CANCELLED";
+  return p.sharedAt ? "PASS_SHARED" : "PASS_GENERATED";
+}
+
+export function passView(p: Pass) {
+  return {
+    id: p.id,
+    publicId: p.publicId,
+    status: p.status,
+    issuedAt: p.issuedAt,
+    checkedInAt: p.checkedInAt,
+    holderName: p.holderName,
+    holderRole: p.holderRole,
+    sharedAt: p.sharedAt ?? null,
+  };
+}
+
+function encodeCursor(c: EventCursor): string {
+  return btoa(JSON.stringify([c.createdAt, c.id])).replace(/=+$/, "");
+}
+
+function decodeCursor(raw: unknown): EventCursor | null {
+  if (typeof raw !== "string" || !raw) return null;
+  try {
+    const [createdAt, id] = JSON.parse(atob(raw)) as [string, string];
+    if (typeof createdAt === "string" && !Number.isNaN(Date.parse(createdAt)) && isUuid(id)) return { createdAt, id };
+  } catch {
+    /* fall through */
+  }
+  throw new EventError("VALIDATION", "Invalid page cursor.");
+}
+
+const GUEST_FILTERS: GuestFilter[] = ["ALL", "NO_PASS", "HAS_PASS", "PASS_SHARED", "CHECKED_IN", "NOT_CHECKED_IN", "CANCELLED"];
+const GUEST_SORTS: GuestSort[] = ["name", "created", "generated", "checked_in", "stage"];
 
 export class EventService {
   private repo: EventRepository;
@@ -219,21 +268,67 @@ export class EventService {
   // Events
   // -------------------------------------------------------------------------
 
-  async listMyEvents(ctx: RequestContext): Promise<EventSummary[]> {
+  /** My Invitations list: summary fields + counts only, newest first, cursor-paginated. */
+  async listMyEvents(ctx: RequestContext, opts: { limit?: unknown; cursor?: unknown } = {}): Promise<EventListPage> {
     const actor = this.requireActor(ctx);
-    const owned = await this.repo.listEventsByOwner(actor.userId);
-    const staffIds = await this.repo.staffEventIds(actor.userId, actor.email ? normalizeEmail(actor.email) : null);
-    const ownedIds = new Set(owned.map((e) => e.id));
-    const staffEvents = await this.repo.listEventsByIds(staffIds.filter((id) => !ownedIds.has(id)));
-    const all = [...owned, ...staffEvents.filter((e) => e.status !== "DRAFT")];
-    const counts = await this.repo.countsForEvents(all.map((e) => e.id));
-    return all
-      .map((event) => ({
-        event,
-        stats: statsFrom(event, counts.get(event.id)),
-        access: ownedIds.has(event.id) ? ("ORGANIZER" as const) : ("STAFF" as const),
-      }))
-      .sort((a, b) => a.event.startDatetime.localeCompare(b.event.startDatetime));
+    const limit = Math.min(Math.max(1, Math.floor(Number(opts.limit) || 24)), 100);
+    const cursor = decodeCursor(opts.cursor);
+    const rows = await this.repo.listEventSummaries({
+      userId: actor.userId,
+      email: actor.email ? normalizeEmail(actor.email) : null,
+      limit: limit + 1,
+      cursor,
+    });
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+      events: page.map((r) => ({ event: r.event, stats: statsFrom(r.event, r.counts), access: r.access })),
+      nextCursor: rows.length > limit && last ? encodeCursor({ createdAt: last.event.createdAt, id: last.event.id }) : null,
+    };
+  }
+
+  /** Invitation overview: event, timeline, and counts — no guest or pass rows. */
+  async getEventOverview(ctx: RequestContext, eventId: string): Promise<EventOverview> {
+    const event = await this.loadOwned(ctx, eventId);
+    const [timeline, stats] = await Promise.all([this.repo.listTimeline(event.id), this.stats(event)]);
+    return { event, timeline, stats, access: "ORGANIZER" };
+  }
+
+  /** Server-side search / filter / sort / pagination for large guest lists. */
+  async queryGuests(ctx: RequestContext, eventId: string, query: GuestQuery): Promise<GuestPage> {
+    const event = await this.loadOwned(ctx, eventId);
+    const normalized = this.normalizeGuestQuery(query);
+    const { rows, total } = await this.repo.queryGuestRows(event.id, normalized);
+    return { rows, total, limit: normalized.limit, offset: normalized.offset };
+  }
+
+  private normalizeGuestQuery(query: GuestQuery) {
+    const filter = GUEST_FILTERS.includes(query.filter as GuestFilter) ? (query.filter as GuestFilter) : "ALL";
+    const sort = GUEST_SORTS.includes(query.sort as GuestSort) ? (query.sort as GuestSort) : "created";
+    const role = query.role && (GUEST_ROLES as readonly string[]).includes(query.role) ? query.role : "ALL";
+    return {
+      q: typeof query.q === "string" ? query.q.trim().slice(0, 100) : "",
+      filter,
+      role,
+      sort,
+      dir: query.dir === "desc" ? ("desc" as const) : ("asc" as const),
+      limit: Math.min(Math.max(1, Math.floor(Number(query.limit) || 50)), 500),
+      offset: Math.max(0, Math.floor(Number(query.offset) || 0)),
+    };
+  }
+
+  /** Every guest matching the current search/filter, for CSV export (no tokens or links). */
+  async exportGuests(ctx: RequestContext, eventId: string, query: GuestQuery): Promise<GuestRow[]> {
+    const event = await this.loadOwned(ctx, eventId);
+    const base = { ...this.normalizeGuestQuery(query), limit: 500 };
+    const all: GuestRow[] = [];
+    for (let offset = 0; offset < 20_000; offset += 500) {
+      const { rows } = await this.repo.queryGuestRows(event.id, { ...base, offset });
+      all.push(...rows);
+      if (rows.length < 500) break;
+    }
+    await this.audit(ctx, "guest.export", { eventId: event.id, targetType: "guest", metadata: { count: all.length, filter: base.filter } });
+    return all;
   }
 
   async createEvent(ctx: RequestContext, input: CreateEventInput): Promise<EventDetail> {
@@ -345,9 +440,7 @@ export class EventService {
       const p = byGuest.get(g.id);
       return {
         ...g,
-        pass: p
-          ? { id: p.id, publicId: p.publicId, status: p.status, issuedAt: p.issuedAt, checkedInAt: p.checkedInAt, holderName: p.holderName, holderRole: p.holderRole }
-          : null,
+        pass: p ? passView(p) : null,
       };
     });
     return {
@@ -651,35 +744,35 @@ export class EventService {
       secureToken: secureToken(),
       issuedAt: this.nowIso(),
       cancelledAt: null,
+      sharedAt: null,
     });
     await this.audit(ctx, "pass.reissue", { eventId: event.id, targetType: "pass", targetId: pass.id });
     return updated;
   }
 
-  /** Organizer-only: the guest's private pass link (never exposed in list responses). */
-  async sharePass(ctx: RequestContext, eventId: string, guestId: string): Promise<{ passToken: string; passPublicId: string; guestName: string; phone: string; email: string }> {
+  /**
+   * Organizer-only: the guest's private pass link (never exposed in list responses).
+   * `purpose: "share"` records that the pass was sent (Pass Shared); "view" does not.
+   */
+  async sharePass(
+    ctx: RequestContext,
+    eventId: string,
+    guestId: string,
+    opts: { purpose?: unknown } = {},
+  ): Promise<{ passToken: string; passPublicId: string; guestName: string; phone: string; email: string; sharedAt: string | null }> {
     const event = await this.loadOwned(ctx, eventId);
     const guest = await this.repo.getGuest(guestId);
     if (!guest || guest.eventId !== event.id) throw new EventError("NOT_FOUND", "This guest could not be found.");
     const pass = await this.repo.getPassByGuest(guest.id);
     if (!pass) throw new EventError("NOT_FOUND", "Generate a pass for this guest first.");
     if (pass.status === "CANCELLED") throw new EventError("INVALID_TRANSITION", "This pass is cancelled. Reissue it before sharing.");
-    await this.audit(ctx, "pass.share", { eventId: event.id, targetType: "pass", targetId: pass.id });
-    return { passToken: pass.secureToken, passPublicId: pass.publicId, guestName: guest.name, phone: guest.phone, email: guest.email };
-  }
-
-  /** Organizer-only bulk export of pass links for mail-merge / bulk messaging. */
-  async exportPassLinks(ctx: RequestContext, eventId: string): Promise<{ name: string; email: string; phone: string; role: string; passPublicId: string; passToken: string; status: string }[]> {
-    const event = await this.loadOwned(ctx, eventId);
-    const [guests, passes] = await Promise.all([this.repo.listGuests(event.id), this.repo.listPasses(event.id)]);
-    const byGuest = new Map(passes.map((p) => [p.guestId, p]));
-    await this.audit(ctx, "pass.export", { eventId: event.id, targetType: "pass", metadata: { count: passes.length } });
-    return guests
-      .filter((g) => byGuest.has(g.id))
-      .map((g) => {
-        const p = byGuest.get(g.id)!;
-        return { name: g.name, email: g.email, phone: g.phone, role: g.role, passPublicId: p.publicId, passToken: p.secureToken, status: p.status };
-      });
+    let sharedAt = pass.sharedAt ?? null;
+    if (opts.purpose === "share") {
+      sharedAt = this.nowIso();
+      await this.repo.updatePass(pass.id, { sharedAt });
+    }
+    await this.audit(ctx, opts.purpose === "share" ? "pass.share" : "pass.view_link", { eventId: event.id, targetType: "pass", targetId: pass.id });
+    return { passToken: pass.secureToken, passPublicId: pass.publicId, guestName: guest.name, phone: guest.phone, email: guest.email, sharedAt };
   }
 
   // -------------------------------------------------------------------------

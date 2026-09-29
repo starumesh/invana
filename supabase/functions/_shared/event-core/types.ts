@@ -105,6 +105,8 @@ export type Pass = {
   issuedAt: string;
   checkedInAt: string | null;
   cancelledAt: string | null;
+  /** Last time the organizer shared the pass (WhatsApp / copy / share sheet). */
+  sharedAt?: string | null;
 };
 
 export type ScanType = "CHECK_IN" | "RE_ENTRY";
@@ -211,6 +213,7 @@ export type EventStats = {
   cancelled: number;
   passesIssued: number;
   passesPending: number;
+  passesShared: number;
   attendancePercent: number;
 };
 
@@ -221,7 +224,44 @@ export type EventSummary = {
 };
 
 export type GuestWithPass = Guest & {
-  pass: Pick<Pass, "id" | "publicId" | "status" | "issuedAt" | "checkedInAt" | "holderName" | "holderRole"> | null;
+  pass: Pick<Pass, "id" | "publicId" | "status" | "issuedAt" | "checkedInAt" | "holderName" | "holderRole" | "sharedAt"> | null;
+};
+
+/** Where a guest is in Add Guest → Generate Pass → Share Pass → Check-in. */
+export type GuestStage = "NO_PASS" | "PASS_GENERATED" | "PASS_SHARED" | "CHECKED_IN" | "CANCELLED";
+
+export type GuestRow = GuestWithPass & { stage: GuestStage };
+
+export type GuestFilter = "ALL" | "NO_PASS" | "HAS_PASS" | "PASS_SHARED" | "CHECKED_IN" | "NOT_CHECKED_IN" | "CANCELLED";
+export type GuestSort = "name" | "created" | "generated" | "checked_in" | "stage";
+
+export type GuestQuery = {
+  q?: string;
+  filter?: GuestFilter;
+  role?: GuestRole | "ALL";
+  sort?: GuestSort;
+  dir?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+};
+
+export type GuestPage = { rows: GuestRow[]; total: number; limit: number; offset: number };
+
+/** Only what the My Invitations list renders. */
+export type EventListItem = Pick<
+  ManagedEvent,
+  "id" | "publicId" | "name" | "eventType" | "startDatetime" | "timezone" | "durationMinutes" | "venueName" | "city" | "status" | "slug" | "maxCapacity" | "createdAt"
+>;
+
+export type EventListRow = { event: EventListItem; stats: EventStats; access: "ORGANIZER" | "STAFF" };
+
+export type EventListPage = { events: EventListRow[]; nextCursor: string | null };
+
+export type EventOverview = {
+  event: ManagedEvent;
+  timeline: TimelineItem[];
+  stats: EventStats;
+  access: "ORGANIZER";
 };
 
 export type EventDetail = {

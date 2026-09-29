@@ -1,5 +1,8 @@
 import type {
   Attendance,
+  EventListItem,
+  GuestQuery,
+  GuestRow,
   AuditEntry,
   Guest,
   ManagedEvent,
@@ -13,7 +16,10 @@ export type RawEventCounts = {
   cancelled: number;
   checkedIn: number;
   passesIssued: number;
+  passesShared: number;
 };
+
+export type EventCursor = { createdAt: string; id: string };
 
 export type CheckInWrite = {
   attendanceId: string;
@@ -50,6 +56,15 @@ export interface EventRepository {
   listEventsByOwner(userId: string): Promise<ManagedEvent[]>;
   listEventsByIds(ids: string[]): Promise<ManagedEvent[]>;
   countsForEvents(ids: string[]): Promise<Map<string, RawEventCounts>>;
+  /** One round trip for the My Invitations list: owned + assigned (non-draft) events, newest first. */
+  listEventSummaries(input: {
+    userId: string;
+    email: string | null;
+    limit: number;
+    cursor: EventCursor | null;
+  }): Promise<{ event: EventListItem; counts: RawEventCounts; access: "ORGANIZER" | "STAFF" }[]>;
+  /** Filtered, sorted, paginated guest + pass rows (no tokens). */
+  queryGuestRows(eventId: string, query: Required<Omit<GuestQuery, "role">> & { role: GuestQuery["role"] }): Promise<{ rows: GuestRow[]; total: number }>;
 
   listStaff(eventId: string): Promise<StaffAssignment[]>;
   /** Event ids where the user is assigned staff (by bound user id or pending email). */

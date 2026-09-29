@@ -10,3 +10,4 @@ export * from "./repository.ts";
 export * from "./service.ts";
 export * from "./memoryRepository.ts";
 export * from "./router.ts";
+export * from "./guestQuery.ts";

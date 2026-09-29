@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.47.0";
 import {
+  guestStage,
   EventError,
   MESSAGES,
   UniqueViolation,
@@ -7,6 +8,13 @@ import {
   type AuditEntry,
   type CheckInWrite,
   type CheckInWriteResult,
+  type EventCursor,
+  type EventListItem,
+  type GuestQuery,
+  type GuestRow,
+  type GuestRole,
+  type GuestStatus,
+  type PassStatus,
   type EventRepository,
   type Guest,
   type ManagedEvent,
@@ -67,6 +75,7 @@ const PASS_COLUMNS: Record<keyof Pass, string> = {
   secureToken: "secure_token",
   holderName: "holder_name",
   holderRole: "holder_role",
+  sharedAt: "shared_at",
   status: "status",
   issuedAt: "issued_at",
   checkedInAt: "checked_in_at",
@@ -194,9 +203,118 @@ export class SupabaseEventRepository implements EventRepository {
         cancelled: Number(r.cancelled ?? 0),
         checkedIn: Number(r.checked_in ?? 0),
         passesIssued: Number(r.passes_issued ?? 0),
+        passesShared: Number(r.passes_shared ?? 0),
       });
     }
     return out;
+  }
+
+  async listEventSummaries(input: { userId: string; email: string | null; limit: number; cursor: EventCursor | null }) {
+    const { data, error } = await this.sb.rpc("em_event_summaries", {
+      p_user_id: input.userId,
+      p_email: input.email,
+      p_limit: input.limit,
+      p_cursor_created: input.cursor?.createdAt ?? null,
+      p_cursor_id: input.cursor?.id ?? null,
+    });
+    check(error, "event summaries");
+    const iso = (v: unknown) => (typeof v === "string" ? new Date(v).toISOString() : (v as string));
+    return ((data as Row[]) ?? []).map((r) => {
+      const event: EventListItem = {
+        id: r.id as string,
+        publicId: r.public_id as string,
+        name: r.name as string,
+        eventType: r.event_type as string,
+        startDatetime: iso(r.start_datetime),
+        timezone: r.timezone as string,
+        durationMinutes: Number(r.duration_minutes),
+        venueName: r.venue_name as string,
+        city: r.city as string,
+        status: r.status as EventListItem["status"],
+        slug: (r.slug as string | null) ?? null,
+        maxCapacity: Number(r.max_capacity),
+        createdAt: iso(r.created_at),
+      };
+      return {
+        event,
+        access: r.access === "STAFF" ? ("STAFF" as const) : ("ORGANIZER" as const),
+        counts: {
+          invited: Number(r.invited ?? 0),
+          cancelled: Number(r.cancelled ?? 0),
+          checkedIn: Number(r.checked_in ?? 0),
+          passesIssued: Number(r.passes_issued ?? 0),
+          passesShared: Number(r.passes_shared ?? 0),
+        },
+      };
+    });
+  }
+
+  async queryGuestRows(
+    eventId: string,
+    query: Required<Omit<GuestQuery, "role">> & { role: GuestQuery["role"] },
+  ): Promise<{ rows: GuestRow[]; total: number }> {
+    let qb = this.sb.from("em_guest_rows").select("*", { count: "exact" }).eq("event_id", eventId);
+    switch (query.filter) {
+      case "NO_PASS":
+      case "PASS_SHARED":
+      case "CHECKED_IN":
+      case "CANCELLED":
+        qb = qb.eq("stage", query.filter);
+        break;
+      case "HAS_PASS":
+        qb = qb.in("stage", ["PASS_GENERATED", "PASS_SHARED", "CHECKED_IN"]);
+        break;
+      case "NOT_CHECKED_IN":
+        qb = qb.in("stage", ["NO_PASS", "PASS_GENERATED", "PASS_SHARED"]);
+        break;
+    }
+    if (query.role && query.role !== "ALL") qb = qb.eq("role", query.role);
+    const q = query.q.replace(/[^\p{L}\p{N}@.+\- ]/gu, " ").trim();
+    if (q) {
+      const like = `*${q.replace(/\s+/g, "*")}*`;
+      const digits = q.replace(/\D/g, "");
+      const ors = [`name.ilike.${like}`, `email.ilike.${like}`, `pass_public_id.ilike.${like}`];
+      if (digits.length >= 3) ors.push(`phone.like.*${digits}*`);
+      qb = qb.or(ors.join(","));
+    }
+    const column = { name: "name_key", created: "created_at", generated: "pass_issued_at", checked_in: "pass_checked_in_at", stage: "stage" }[query.sort];
+    qb = qb.order(column, { ascending: query.dir !== "desc", nullsFirst: false }).order("id", { ascending: true });
+    const { data, error, count } = await qb.range(query.offset, query.offset + query.limit - 1);
+    if (error?.code === "PGRST103") {
+      // Page past the end (e.g. a filter shrank the result): empty page, keep the real total.
+      const { total } = await this.queryGuestRows(eventId, { ...query, offset: 0, limit: 1 });
+      return { rows: [], total };
+    }
+    check(error, "query guests");
+    const iso = (v: unknown) => (typeof v === "string" ? new Date(v).toISOString() : null);
+    const rows: GuestRow[] = ((data as Row[]) ?? []).map((r) => {
+      const guest = {
+        id: r.id as string,
+        eventId: r.event_id as string,
+        name: r.name as string,
+        email: (r.email as string) ?? "",
+        phone: (r.phone as string) ?? "",
+        bio: (r.bio as string) ?? "",
+        role: r.role as GuestRole,
+        status: r.status as GuestStatus,
+        createdAt: iso(r.created_at) ?? "",
+        updatedAt: iso(r.updated_at) ?? "",
+      };
+      const pass = r.pass_id
+        ? {
+            id: r.pass_id as string,
+            publicId: r.pass_public_id as string,
+            status: r.pass_status as PassStatus,
+            issuedAt: iso(r.pass_issued_at) ?? "",
+            checkedInAt: iso(r.pass_checked_in_at),
+            holderName: (r.pass_holder_name as string) ?? guest.name,
+            holderRole: ((r.pass_holder_role as GuestRole) ?? guest.role) as GuestRole,
+            sharedAt: iso(r.pass_shared_at),
+          }
+        : null;
+      return { ...guest, pass, stage: (r.stage as GuestRow["stage"]) ?? guestStage(guest, pass) };
+    });
+    return { rows, total: count ?? rows.length };
   }
 
   async listStaff(eventId: string) {
