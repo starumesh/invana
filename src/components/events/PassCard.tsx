@@ -64,8 +64,9 @@ export function PassCard({ view }: { view: GuestPassView }) {
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-[0.2em] text-gold-dark">Guest</p>
             <p className="truncate text-xl font-semibold">{view.guest.name}</p>
+            {view.guest.contactHint ? <p className="text-xs text-ink-muted">Registered contact {view.guest.contactHint}</p> : null}
           </div>
-          <span className="shrink-0 rounded-full bg-gold px-3 py-1 text-sm font-semibold text-ink">{GUEST_ROLE_LABELS[view.guest.role]}</span>
+          <span aria-label={`Role: ${GUEST_ROLE_LABELS[view.guest.role]}`} className="shrink-0 rounded-full bg-gold px-3 py-1 text-sm font-semibold text-ink">{GUEST_ROLE_LABELS[view.guest.role]}</span>
         </div>
         <div className={inactive ? "mt-5 opacity-30 grayscale" : "mt-5"}>
           <QrCode

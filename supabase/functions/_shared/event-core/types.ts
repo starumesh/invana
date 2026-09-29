@@ -98,6 +98,9 @@ export type Pass = {
   eventId: string;
   guestId: string;
   secureToken: string;
+  /** Snapshot of who the pass is for; refreshed when the guest is edited. */
+  holderName: string;
+  holderRole: GuestRole;
   status: PassStatus;
   issuedAt: string;
   checkedInAt: string | null;
@@ -218,7 +221,7 @@ export type EventSummary = {
 };
 
 export type GuestWithPass = Guest & {
-  pass: Pick<Pass, "id" | "publicId" | "status" | "issuedAt" | "checkedInAt"> | null;
+  pass: Pick<Pass, "id" | "publicId" | "status" | "issuedAt" | "checkedInAt" | "holderName" | "holderRole"> | null;
 };
 
 export type EventDetail = {
@@ -254,7 +257,7 @@ export type PublicEventView = {
 
 export type GuestPassView = {
   pass: { publicId: string; status: PassStatus; issuedAt: string; checkedInAt: string | null };
-  guest: { name: string; role: GuestRole };
+  guest: { name: string; role: GuestRole; contactHint: string };
   event: Omit<PublicEventView, "featuredGuests" | "registeredCount" | "timeline" | "slug" | "maxCapacity"> & {
     slug: string | null;
   };

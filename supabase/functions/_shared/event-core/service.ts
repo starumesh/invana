@@ -17,6 +17,7 @@ import type {
   Guest,
   GuestInput,
   GuestPassView,
+  GuestRole,
   GuestWithPass,
   ManagedEvent,
   Pass,
@@ -344,7 +345,9 @@ export class EventService {
       const p = byGuest.get(g.id);
       return {
         ...g,
-        pass: p ? { id: p.id, publicId: p.publicId, status: p.status, issuedAt: p.issuedAt, checkedInAt: p.checkedInAt } : null,
+        pass: p
+          ? { id: p.id, publicId: p.publicId, status: p.status, issuedAt: p.issuedAt, checkedInAt: p.checkedInAt, holderName: p.holderName, holderRole: p.holderRole }
+          : null,
       };
     });
     return {
@@ -501,6 +504,10 @@ export class EventService {
       if (err instanceof UniqueViolation) throw new EventError("DUPLICATE_GUEST", MESSAGES.duplicateGuest);
       throw err;
     });
+    const pass = await this.repo.getPassByGuest(guestId);
+    if (pass && (pass.holderName !== updated.name || pass.holderRole !== updated.role)) {
+      await this.repo.updatePass(pass.id, { holderName: updated.name, holderRole: updated.role });
+    }
     await this.audit(ctx, "guest.update", { eventId: event.id, targetType: "guest", targetId: guestId });
     return updated;
   }
@@ -527,21 +534,44 @@ export class EventService {
   // -------------------------------------------------------------------------
 
   /**
-   * Issue passes for up to one batch of guests that don't have one yet. Clients loop until
-   * `pending === 0`, which keeps each request short and lets the UI show "87 / 100 generated".
+   * Issue passes on request for the selected guests (organizer picks 1, 5, or any N).
+   * Guests that already have a pass or are cancelled are skipped, never re-issued.
+   * Without `guestIds`, issues up to one batch of guests that have no pass yet.
    */
   async generatePasses(
     ctx: RequestContext,
     eventId: string,
-    opts: { batchSize?: number } = {},
-  ): Promise<{ generated: number; issued: number; total: number; pending: number }> {
+    opts: { guestIds?: unknown; batchSize?: number } = {},
+  ): Promise<{
+    generated: number;
+    skipped: number;
+    issued: number;
+    total: number;
+    pending: number;
+    passes: { guestId: string; publicId: string; holderName: string; holderRole: GuestRole }[];
+  }> {
     const event = await this.loadOwned(ctx, eventId);
     if (!isEditable(event.status)) throw new EventError("INVALID_TRANSITION", MESSAGES.passGenerationFailed);
-    const batch = Math.min(Math.max(1, Math.floor(opts.batchSize ?? this.passBatchSize)), 200);
     const [guests, passes] = await Promise.all([this.repo.listGuests(event.id), this.repo.listPasses(event.id)]);
     const withPass = new Set(passes.map((p) => p.guestId));
     const eligible = guests.filter((g) => g.status !== "CANCELLED");
-    const todo = eligible.filter((g) => !withPass.has(g.id)).slice(0, batch);
+    let todo: Guest[];
+    let skipped = 0;
+    if (opts.guestIds !== undefined) {
+      if (!Array.isArray(opts.guestIds) || !opts.guestIds.every((id) => typeof id === "string")) {
+        throw new EventError("VALIDATION", "Select the guests to generate passes for.");
+      }
+      const ids = Array.from(new Set(opts.guestIds as string[]));
+      if (!ids.length) throw new EventError("VALIDATION", "Select at least one guest.");
+      if (ids.length > 200) throw new EventError("VALIDATION", "Generate at most 200 passes per request.");
+      const byId = new Map(guests.map((g) => [g.id, g]));
+      if (ids.some((id) => !byId.has(id))) throw new EventError("NOT_FOUND", "Some selected guests are not part of this event.");
+      todo = ids.map((id) => byId.get(id)!).filter((g) => g.status !== "CANCELLED" && !withPass.has(g.id));
+      skipped = ids.length - todo.length;
+    } else {
+      const batch = Math.min(Math.max(1, Math.floor(opts.batchSize ?? this.passBatchSize)), 200);
+      todo = eligible.filter((g) => !withPass.has(g.id)).slice(0, batch);
+    }
     const now = this.nowIso();
     const rows: Pass[] = todo.map((g) => ({
       id: uuid(),
@@ -549,6 +579,8 @@ export class EventService {
       eventId: event.id,
       guestId: g.id,
       secureToken: secureToken(),
+      holderName: g.name,
+      holderRole: g.role,
       status: "ISSUED",
       issuedAt: now,
       checkedInAt: null,
@@ -563,20 +595,26 @@ export class EventService {
           throw new EventError("PASS_GENERATION_FAILED", MESSAGES.passGenerationFailed);
         });
       } else if (err instanceof UniqueViolation && err.field === "guest_id") {
-        /* a concurrent batch already issued these — the next loop recomputes pending */
+        throw new EventError("PASS_GENERATION_FAILED", "Some of these guests already received a pass. Refresh and try again.");
       } else {
         throw new EventError("PASS_GENERATION_FAILED", MESSAGES.passGenerationFailed);
       }
     }
     const activePasses = passes.filter((p) => eligible.some((g) => g.id === p.guestId)).length + rows.length;
     if (rows.length) {
-      await this.audit(ctx, "pass.generate", { eventId: event.id, targetType: "pass", metadata: { count: rows.length } });
+      await this.audit(ctx, "pass.generate", {
+        eventId: event.id,
+        targetType: "pass",
+        metadata: { count: rows.length, skipped, guestIds: rows.map((r) => r.guestId) },
+      });
     }
     return {
       generated: rows.length,
+      skipped,
       issued: activePasses,
       total: eligible.length,
       pending: Math.max(0, eligible.length - activePasses),
+      passes: rows.map((r) => ({ guestId: r.guestId, publicId: r.publicId, holderName: r.holderName, holderRole: r.holderRole })),
     };
   }
 
@@ -702,7 +740,7 @@ export class EventService {
     }
     return {
       pass: { publicId: pass.publicId, status: pass.status, issuedAt: pass.issuedAt, checkedInAt: pass.checkedInAt },
-      guest: { name: guest.name, role: guest.role },
+      guest: { name: guest.name, role: guest.role, contactHint: maskPhone(guest.phone) || maskEmail(guest.email) },
       event: { ...this.publicEventCore(event), slug: event.status === "DRAFT" ? null : event.slug },
       qrPayload: encodeQrPayload(event.id, pass.secureToken),
     };

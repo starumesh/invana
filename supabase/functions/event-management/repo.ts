@@ -65,6 +65,8 @@ const PASS_COLUMNS: Record<keyof Pass, string> = {
   eventId: "event_id",
   guestId: "guest_id",
   secureToken: "secure_token",
+  holderName: "holder_name",
+  holderRole: "holder_role",
   status: "status",
   issuedAt: "issued_at",
   checkedInAt: "checked_in_at",

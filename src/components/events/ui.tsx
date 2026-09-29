@@ -4,6 +4,7 @@ import type { EventStatus, PassStatus, GuestStatus } from "@event-core";
 import { Button } from "@/components/ui/Button";
 import { buttonClassName } from "@/components/ui/buttonStyles";
 import { cn } from "@/lib/cn";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-stone-100 text-stone-700 ring-stone-300",
@@ -200,6 +201,20 @@ export function ConfirmDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Events run only against the Supabase backend — there is no browser-local mode. */
+export function RequireSupabase({ children }: { children: ReactNode }) {
+  if (isSupabaseConfigured()) return <>{children}</>;
+  return (
+    <main className="mx-auto max-w-lg px-4 py-16 text-center">
+      <h1 className="font-serif text-3xl">Events need the Invana backend</h1>
+      <p className="mt-3 text-ink-muted">
+        Event management, passes, and check-in run on Supabase only. Set <code>VITE_SUPABASE_URL</code> and{" "}
+        <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>, apply the event migrations, and deploy the <code>event-management</code> function.
+      </p>
+    </main>
   );
 }
 

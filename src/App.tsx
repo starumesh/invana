@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { Shell } from "@/components/layout/Shell";
+import { RequireSupabase } from "@/components/events/ui";
 import { AnalyticsListener } from "@/components/seo/AnalyticsListener";
 import { Seo } from "@/components/seo/Seo";
 import { BuilderPage } from "@/pages/BuilderPage";
@@ -26,6 +27,14 @@ const PublicEventPage = named(() => import("@/pages/events/PublicEventPage"), "P
 const GuestPassPage = named(() => import("@/pages/events/GuestPassPage"), "GuestPassPage");
 
 function Lazy({ children }: { children: ReactNode }) {
+  return (
+    <RequireSupabase>
+      <LazyInner>{children}</LazyInner>
+    </RequireSupabase>
+  );
+}
+
+function LazyInner({ children }: { children: ReactNode }) {
   return (
     <Suspense
       fallback={

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Field";
 import { cn } from "@/lib/cn";
 import { downloadFile } from "@/lib/download";
-import { DEMO_STORAGE_KEY, errorMessage, eventsApi } from "@/services/eventManagement/client";
+import { errorMessage, eventsApi } from "@/services/eventManagement/client";
 
 const FILTERS: { id: AttendanceFilter; label: string }[] = [
   { id: "ALL", label: "All" },
@@ -56,18 +56,15 @@ export function EventAttendancePage() {
     return () => clearTimeout(t);
   }, [ready, signedIn, load, q]);
 
-  // Near-real-time: poll while visible, refresh on focus, and react to other tabs in Demo Mode.
+  // Near-real-time: poll while visible and refresh on focus.
   useEffect(() => {
     if (!ready || !signedIn || !live) return;
     const tick = () => document.visibilityState === "visible" && void load();
     const interval = setInterval(tick, POLL_MS);
-    const onStorage = (e: StorageEvent) => e.key === DEMO_STORAGE_KEY && void load();
     window.addEventListener("focus", tick);
-    window.addEventListener("storage", onStorage);
     return () => {
       clearInterval(interval);
       window.removeEventListener("focus", tick);
-      window.removeEventListener("storage", onStorage);
     };
   }, [ready, signedIn, live, load]);
 

@@ -200,9 +200,9 @@ describe("pass API", () => {
     const { body } = await call<EventDetail>(ORGANIZER, "POST", "/events", { details, guests: [{ name: "A" }, { name: "B" }, { name: "C" }] });
     const id = body.event.id;
     const first = await call(ORGANIZER, "POST", `/events/${id}/passes/generate`, {});
-    expect(first.body).toEqual({ generated: 2, issued: 2, total: 3, pending: 1 });
+    expect(first.body).toMatchObject({ generated: 2, issued: 2, total: 3, pending: 1 });
     const second = await call(ORGANIZER, "POST", `/events/${id}/passes/generate`, {});
-    expect(second.body).toEqual({ generated: 1, issued: 3, total: 3, pending: 0 });
+    expect(second.body).toMatchObject({ generated: 1, issued: 3, total: 3, pending: 0 });
     const third = await call(ORGANIZER, "POST", `/events/${id}/passes/generate`, {});
     expect(third.body).toMatchObject({ generated: 0, pending: 0 });
     const passes = repo.data.passes;

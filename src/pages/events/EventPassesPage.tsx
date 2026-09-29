@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatEventTime, GUEST_ROLE_LABELS, toCsv, type GuestWithPass } from "@event-core";
-import { ConfirmDialog, ErrorBanner, EventSubNav, LoadingBlock, Notice, PageTitle, ProgressBar, SignInRequired, StatusBadge } from "@/components/events/ui";
+import { ConfirmDialog, ErrorBanner, EventSubNav, LoadingBlock, Notice, PageTitle, SignInRequired, StatusBadge } from "@/components/events/ui";
 import { Button } from "@/components/ui/Button";
+import { buttonClassName } from "@/components/ui/buttonStyles";
 import { downloadFile } from "@/lib/download";
 import { copyText, guestPassUrl, passWhatsAppText, whatsAppUrl } from "@/lib/eventShare";
-import { errorMessage, eventsApi, generateAllPasses } from "@/services/eventManagement/client";
+import { errorMessage, eventsApi } from "@/services/eventManagement/client";
 import { useEventDetail } from "@/pages/events/useEventDetail";
 
 export function EventPassesPage() {
@@ -14,7 +15,6 @@ export function EventPassesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [cancelling, setCancelling] = useState<GuestWithPass | null>(null);
-  const [progress, setProgress] = useState<{ issued: number; total: number } | null>(null);
 
   if (!ready) return <main className="mx-auto max-w-6xl px-4 py-12"><LoadingBlock /></main>;
   if (!signedIn) return <SignInRequired />;
@@ -73,21 +73,9 @@ export function EventPassesPage() {
       <div className="mt-3">
         <PageTitle eyebrow="Guest passes" title={`${stats.passesIssued} passes issued`}>
           {stats.passesPending && editable ? (
-            <Button
-              size="sm"
-              variant="gold"
-              disabled={busy}
-              onClick={() =>
-                void act(async () => {
-                  setProgress({ issued: stats.passesIssued, total: stats.invited });
-                  await generateAllPasses(event.id, setProgress);
-                  setProgress(null);
-                  await reload();
-                }, "Unable to generate guest passes. Please try again.")
-              }
-            >
-              Generate {stats.passesPending} pending
-            </Button>
+            <Link to={`/events/${event.id}/guests`} state={{ select: "without-pass" }} className={buttonClassName("gold", "sm")}>
+              {stats.passesPending} without a pass — select guests
+            </Link>
           ) : null}
           <Button size="sm" variant="secondary" onClick={() => void exportCsv()} disabled={busy || !withPass.length}>
             Export links (CSV)
@@ -99,7 +87,6 @@ export function EventPassesPage() {
         {event.status === "DRAFT" ? <Notice tone="warn">Passes can be shared now, but check-in only works after you publish the event.</Notice> : null}
         {notice ? <Notice tone="success">{notice}</Notice> : null}
         <ErrorBanner message={error} />
-        {progress ? <ProgressBar value={progress.issued} max={progress.total} label="Generating guest passes" /> : null}
       </div>
 
       <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -107,8 +94,11 @@ export function EventPassesPage() {
           <li key={g.id} className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate font-medium">{g.name}</p>
-                <p className="text-xs text-ink-muted">{GUEST_ROLE_LABELS[g.role]}</p>
+                <p className="truncate font-medium">{g.pass!.holderName}</p>
+                <p className="text-xs text-ink-muted">
+                  {GUEST_ROLE_LABELS[g.pass!.holderRole]}
+                  {[g.email, g.phone].filter(Boolean).length ? ` · ${[g.email, g.phone].filter(Boolean).join(" · ")}` : ""}
+                </p>
               </div>
               <StatusBadge status={g.pass!.status} />
             </div>

@@ -18,14 +18,14 @@ import {
 import { useAuthSession } from "@/auth/AuthSession";
 import { CsvImport, GuestForm, type GuestDraft } from "@/components/events/GuestForms";
 import { TileMap } from "@/components/events/TileMap";
-import { ErrorBanner, FormField, LoadingBlock, Notice, PageTitle, ProgressBar, SignInRequired } from "@/components/events/ui";
+import { ErrorBanner, FormField, LoadingBlock, Notice, PageTitle, SignInRequired } from "@/components/events/ui";
 import { Button } from "@/components/ui/Button";
 import { buttonClassName } from "@/components/ui/buttonStyles";
 import { Input, Select, Textarea } from "@/components/ui/Field";
 import { EVENT_TYPE_OPTIONS, templateFor } from "@/config/event-templates";
 import { cn } from "@/lib/cn";
 import { mapProvider, openInMapsUrl, type GeocodeResult } from "@/lib/maps";
-import { EVENT_MAX_CAPACITY, EmApiError, errorMessage, eventsApi, generateAllPasses } from "@/services/eventManagement/client";
+import { EVENT_MAX_CAPACITY, EmApiError, errorMessage, eventsApi } from "@/services/eventManagement/client";
 
 type TimelineDraft = { key: string; start: string; end: string; title: string; description: string; location: string };
 
@@ -160,7 +160,6 @@ export function EventWizardPage() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(editing);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ issued: number; total: number } | null>(null);
   const [guestPanel, setGuestPanel] = useState<"single" | "csv">("single");
   const headingRef = useRef<HTMLHeadingElement>(null);
   const step = steps[stepIndex];
@@ -333,19 +332,18 @@ export function EventWizardPage() {
       localStorage.removeItem(AUTOSAVE_KEY);
       const id = created.event.id;
       if (mode === "create" && created.guests.length) {
-        setProgress({ issued: 0, total: created.guests.length });
-        try {
-          await generateAllPasses(id, setProgress);
-        } catch (err) {
-          navigate(`/events/${id}/manage`, { state: { notice: `Event saved as a draft. ${errorMessage(err, "Unable to generate guest passes. Please try again.")}` } });
-          return;
-        }
+        navigate(`/events/${id}/guests`, {
+          state: {
+            notice: `Event created with ${created.guests.length} guest${created.guests.length === 1 ? "" : "s"}. Select guests and choose Generate passes when you're ready.`,
+          },
+        });
+        return;
       }
       navigate(`/events/${id}/manage`, {
         state: {
           notice:
             mode === "create"
-              ? `Event created with ${created.guests.length} guest pass${created.guests.length === 1 ? "" : "es"}. Review and publish when you're ready.`
+              ? "Event created. Add guests, then generate passes for the ones you select."
               : "Draft saved. You can keep editing, add guests, and publish later.",
         },
       });
@@ -353,7 +351,6 @@ export function EventWizardPage() {
       applyServerError(err, editing ? "Unable to update the event. Please check the required fields." : "Unable to create the event. Please check the required fields.");
     } finally {
       setBusy(false);
-      setProgress(null);
     }
   }
 
@@ -537,7 +534,7 @@ export function EventWizardPage() {
         {step === "Guests" ? (
           <div className="mt-6 space-y-5">
             <p className="text-sm text-ink-muted" aria-live="polite">
-              {draft.guests.length} / {capacityNum.toLocaleString()} guests · passes are generated when you create the event.
+              {draft.guests.length} / {capacityNum.toLocaleString()} guests · after creating the event, select guests and generate their passes.
             </p>
             <div className="flex gap-2" role="tablist" aria-label="Add guests">
               {(["single", "csv"] as const).map((t) => (
@@ -655,7 +652,6 @@ export function EventWizardPage() {
                 )}
               </div>
             ) : null}
-            {progress ? <ProgressBar value={progress.issued} max={progress.total} label="Generating guest passes" /> : null}
           </div>
         ) : null}
       </section>

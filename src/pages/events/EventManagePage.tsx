@@ -10,7 +10,6 @@ import {
   LoadingBlock,
   Notice,
   PageTitle,
-  ProgressBar,
   SignInRequired,
   StatCard,
   StatusBadge,
@@ -20,7 +19,7 @@ import { buttonClassName } from "@/components/ui/buttonStyles";
 import { Input } from "@/components/ui/Field";
 import { eventWhatsAppText, publicEventUrl } from "@/lib/eventShare";
 import { openInMapsUrl } from "@/lib/maps";
-import { errorMessage, eventsApi, generateAllPasses } from "@/services/eventManagement/client";
+import { errorMessage, eventsApi } from "@/services/eventManagement/client";
 import { useEventDetail } from "@/pages/events/useEventDetail";
 
 type Action = "publish" | "unpublish" | "cancel" | "complete";
@@ -55,7 +54,6 @@ export function EventManagePage() {
   const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null);
   const [pending, setPending] = useState<Action | null>(null);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ issued: number; total: number } | null>(null);
 
   if (!ready) return <main className="mx-auto max-w-6xl px-4 py-12"><LoadingBlock /></main>;
   if (!signedIn) return <SignInRequired />;
@@ -96,20 +94,6 @@ export function EventManagePage() {
     } finally {
       setBusy(false);
       setPending(null);
-    }
-  }
-
-  async function generate() {
-    setError(null);
-    setProgress({ issued: stats.passesIssued, total: stats.invited });
-    try {
-      const r = await generateAllPasses(event.id, setProgress);
-      setNotice(`${r.issued} of ${r.total} guest passes ready.`);
-      await reload();
-    } catch (err) {
-      setError(errorMessage(err, "Unable to generate guest passes. Please try again."));
-    } finally {
-      setProgress(null);
     }
   }
 
@@ -182,19 +166,13 @@ export function EventManagePage() {
       </section>
 
       {stats.passesPending > 0 && editable ? (
-        <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5">
-          {progress ? (
-            <ProgressBar value={progress.issued} max={progress.total} label="Generating guest passes" />
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-amber-900">
-                {stats.passesPending} guest{stats.passesPending === 1 ? "" : "s"} still need a pass.
-              </p>
-              <Button size="sm" onClick={() => void generate()}>
-                Generate passes
-              </Button>
-            </div>
-          )}
+        <section className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-sm text-amber-900">
+            {stats.passesPending} guest{stats.passesPending === 1 ? " doesn't" : "s don't"} have a pass yet. Passes are only generated for the guests you select.
+          </p>
+          <Link to={`/events/${event.id}/guests`} state={{ select: "without-pass" }} className={buttonClassName("primary", "sm")}>
+            Select guests
+          </Link>
         </section>
       ) : null}
 

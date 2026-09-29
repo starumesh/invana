@@ -1,8 +1,4 @@
 import {
-  emptySnapshot,
-  EventService,
-  handleEventRequest,
-  MemoryEventRepository,
   type AttendanceFilter,
   type AttendanceView,
   type CheckInResult,
@@ -15,7 +11,6 @@ import {
   type GuestInput,
   type GuestPassView,
   type ManagedEvent,
-  type MemorySnapshot,
   type Pass,
   type PublicEventView,
   type StaffAssignment,
@@ -23,8 +18,7 @@ import {
   type TimelineInput,
 } from "@event-core";
 import { EdgeApiError, callEdgeFunction } from "@/services/api/edgeClient";
-import { demoAuth } from "@/services/demo";
-import { isDemoMode } from "@/services";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 export const EVENT_MAX_CAPACITY = Number(import.meta.env.VITE_EVENT_MAX_CAPACITY) || 10_000;
 
@@ -47,55 +41,11 @@ export class EmApiError extends Error {
 export const NETWORK_ERROR_MESSAGE =
   "We couldn't reach Invana. Check your internet connection and try again — nothing was lost.";
 
-// ---------------------------------------------------------------------------
-// Demo Mode transport: same router + service in-process, persisted to localStorage.
-// Reloaded before every request so multiple tabs (organizer + door staff) stay in sync.
-// ---------------------------------------------------------------------------
-
-const DEMO_KEY = "invana.em.v1";
-const demoBuckets = new Map<string, number>();
-
-function readSnapshot(): MemorySnapshot {
-  try {
-    const raw = localStorage.getItem(DEMO_KEY);
-    return raw ? { ...emptySnapshot(), ...(JSON.parse(raw) as MemorySnapshot) } : emptySnapshot();
-  } catch {
-    return emptySnapshot();
-  }
-}
-
-function writeSnapshot(data: MemorySnapshot) {
-  const trimmed = { ...data, audit: data.audit.slice(-500) };
-  localStorage.setItem(DEMO_KEY, JSON.stringify(trimmed));
-}
-
-async function demoRequest(method: string, path: string, body?: unknown): Promise<Response> {
-  const repo = new MemoryEventRepository(readSnapshot(), { buckets: demoBuckets, maxAudit: 500 });
-  const service = new EventService(repo, { maxCapacityLimit: EVENT_MAX_CAPACITY });
-  const user = demoAuth.currentUser() ?? demoAuth.ensureUser();
-  const req = new Request(`http://demo.local/event-management${path}`, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const res = await handleEventRequest(service, req, {
-    actor: { userId: user.id, email: user.email },
-    ip: "demo",
-    requestId: crypto.randomUUID(),
-  });
-  if (method !== "GET") writeSnapshot(repo.data);
-  return res;
-}
-
-export const DEMO_STORAGE_KEY = DEMO_KEY;
+export const SUPABASE_REQUIRED_MESSAGE =
+  "Events run on Invana's Supabase backend. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY and deploy the event-management function.";
 
 async function request<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown, opts: { auth?: boolean } = {}): Promise<T> {
-  if (isDemoMode) {
-    const res = await demoRequest(method, path, body);
-    const payload = (await res.json()) as Record<string, unknown>;
-    if (!res.ok) throw toApiError(res.status, payload);
-    return payload as T;
-  }
+  if (!isSupabaseConfigured()) throw new EmApiError(SUPABASE_REQUIRED_MESSAGE, 503, "NOT_CONFIGURED");
   try {
     const result = await callEdgeFunction<T>({ method, path: `event-management${path}`, body, auth: opts.auth ?? true });
     if (result === null) throw new EmApiError("Event management is not configured.", 503, "INTERNAL");
@@ -149,8 +99,15 @@ export const eventsApi = {
       `/events/${enc(id)}/guests/${enc(guestId)}/share`,
     ),
 
-  generatePassesBatch: (id: string, batchSize?: number) =>
-    request<{ generated: number; issued: number; total: number; pending: number }>("POST", `/events/${enc(id)}/passes/generate`, { batchSize }),
+  generatePassesFor: (id: string, guestIds: string[]) =>
+    request<{
+      generated: number;
+      skipped: number;
+      issued: number;
+      total: number;
+      pending: number;
+      passes: { guestId: string; publicId: string; holderName: string; holderRole: string }[];
+    }>("POST", `/events/${enc(id)}/passes/generate`, { guestIds }),
   exportPasses: (id: string) =>
     request<{ passes: { name: string; email: string; phone: string; role: string; passPublicId: string; passToken: string; status: string }[] }>(
       "GET",
@@ -185,23 +142,25 @@ export const eventsApi = {
 };
 
 /**
- * Generate all pending passes in small batches so large guest lists never block
- * a single request; `onProgress` drives the "87 / 100 generated" indicator.
+ * Generate passes for the organizer's selection only. Large selections are sent in
+ * chunks so each request stays short; `onProgress` drives "12 / 40 generated".
  */
-export async function generateAllPasses(
+export async function generatePassesForGuests(
   eventId: string,
-  onProgress: (p: { issued: number; total: number }) => void,
-  opts: { signal?: AbortSignal; batchSize?: number } = {},
-): Promise<{ issued: number; total: number }> {
-  let last = { issued: 0, total: 0 };
-  for (let guard = 0; guard < 1000; guard += 1) {
-    if (opts.signal?.aborted) break;
-    const step = await eventsApi.generatePassesBatch(eventId, opts.batchSize ?? 25);
-    last = { issued: step.issued, total: step.total };
-    onProgress(last);
-    if (step.pending === 0 || step.generated === 0) break;
+  guestIds: string[],
+  onProgress: (p: { done: number; total: number }) => void,
+): Promise<{ generated: number; skipped: number }> {
+  const CHUNK = 25;
+  let generated = 0;
+  let skipped = 0;
+  onProgress({ done: 0, total: guestIds.length });
+  for (let i = 0; i < guestIds.length; i += CHUNK) {
+    const step = await eventsApi.generatePassesFor(eventId, guestIds.slice(i, i + CHUNK));
+    generated += step.generated;
+    skipped += step.skipped;
+    onProgress({ done: Math.min(guestIds.length, i + CHUNK), total: guestIds.length });
   }
-  return last;
+  return { generated, skipped };
 }
 
 export function errorMessage(err: unknown, fallback: string): string {

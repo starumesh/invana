@@ -120,7 +120,9 @@ export async function handleEventRequest(service: EventService, req: Request, ct
     if (section === "passes") {
       if (p[3] === "generate" && m === "POST") {
         const body = await readBody(req);
-        return respond(await service.generatePasses(ctx, id, { batchSize: Number(body.batchSize) || undefined }));
+        return respond(
+          await service.generatePasses(ctx, id, { guestIds: body.guestIds, batchSize: Number(body.batchSize) || undefined }),
+        );
       }
       if (p[3] === "export" && m === "GET") return respond({ passes: await service.exportPassLinks(ctx, id) });
       const passId = p[3];
