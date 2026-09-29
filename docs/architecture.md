@@ -207,11 +207,11 @@ No dual SoR for the same RSVP or the same media bytes.
 ## Event Management
 
 - **Namespaced model.** `em_*` tables sit beside the invitation `events` (text id + `RenderInput` config) instead of overloading it; invite/RSVP flows are unchanged.
-- **One domain core, three transports.** `supabase/functions/_shared/event-core/` holds validation, IDs/tokens, QR payload, status transitions, authorization, rate-limit and audit calls, and the HTTP router. It is runtime-agnostic (Web Crypto + Intl only). The Edge function binds it to a service-role Postgres repository; Demo Mode binds it to a localStorage-backed in-memory repository in the browser; Vitest binds it to the in-memory repository.
+- **One domain core, two transports.** `supabase/functions/_shared/event-core/` holds validation, IDs/tokens, QR payload, status transitions, authorization, rate-limit and audit calls, and the HTTP router. It is runtime-agnostic (Web Crypto + Intl only). The Edge function binds it to a service-role Postgres repository; Vitest binds it to the in-memory repository. The SPA always calls the Edge function — Events have no Demo Mode.
 - **Trust boundary.** Actor comes only from the verified JWT. Client-supplied event/pass/guest ids, roles, and statuses are never trusted: check-in resolves the pass from its token, compares `pass.event_id` with the event being scanned, and re-reads status. Unknown and not-owned events return the same 403 (anti-enumeration).
 - **Atomicity.** `em_record_check_in` flips `ISSUED → CHECKED_IN` under a row lock and inserts the single `CHECK_IN` attendance row; a partial unique index backs it. Capacity is enforced by the service and a `FOR UPDATE` trigger.
-- **Near-real-time attendance.** Dashboard polls every 5 s while visible (and reacts to cross-tab `storage` events in Demo Mode). Supabase Realtime is a later option.
-- **Bulk passes.** Client loops `POST …/passes/generate` in batches (default 25–50) and renders "87 / 100 generated"; a server-side job queue is deferred.
+- **Near-real-time attendance.** Dashboard polls every 5 s while visible. Supabase Realtime is a later option.
+- **Passes on request.** Nothing is issued at event creation. `POST …/passes/generate {guestIds}` issues passes only for the selected guests (max 200 per call; the client chunks larger selections and shows progress). Guests that already have a pass are skipped. Each pass stores `holder_name` / `holder_role`, kept in sync on guest edits.
 
 ## Observability
 

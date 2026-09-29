@@ -36,8 +36,8 @@ Production site: **https://invana.stream**
 - Row Level Security, owner-scoped Storage writes, request IDs, and rate limiting.
 - **Event Management, Digital Pass & Attendance** (`/events`): multi-step event
   creation (details, venue + map pin, capacity, timeline, guests + CSV import,
-  review), draft → publish → public `/events/:slug` page, one secure QR pass per
-  guest (`/pass/:token`), mobile camera check-in with server-side verification,
+  review), draft → publish → public `/events/:slug` page, secure QR passes
+  generated on demand for selected guests (`/pass/:token`), mobile camera check-in with server-side verification,
   door-staff accounts, and live attendance. See
   [Event Management](#event-management-digital-pass--attendance).
 
@@ -81,11 +81,10 @@ Invana enters Connected Mode only when both `VITE_SUPABASE_URL` and
 | `npm run typecheck` | Validate TypeScript |
 | `npm run lint` | Run ESLint with zero warnings |
 | `npm test` | Run Vitest tests (unit + Event Management API suite) |
-| `npm run test:e2e` | Playwright E2E in Demo Mode (first run: `npx playwright install chromium`) |
 | `npm run test:db` | Apply migrations to a throwaway local Postgres and run SQL assertions |
 | `npm run test:edge` | Edge repository integration test against Postgres + PostgREST (needs `psql`, `postgrest`, `deno`) |
 
-There are currently **82 Vitest tests across 8 files** and **11 Playwright tests**. The GitHub Pages
+There are currently **82 Vitest tests across 8 files**. The GitHub Pages
 workflow runs lint, type-check, and build on `main`/`master`; it does not run on
 `develop`.
 
@@ -211,7 +210,7 @@ VITE_EVENT_MAX_CAPACITY=10000   # UI capacity cap; keep equal to the EM_MAX_CAPA
 ## Enable Connected Mode
 
 1. Create a Supabase project.
-2. Apply all six migrations in filename order — see [supabase/README.md](supabase/README.md).
+2. Apply all seven migrations in filename order — see [supabase/README.md](supabase/README.md).
 3. Deploy `invite`, `rsvp`, and `media` for the frontend’s primary Edge paths.
    Deploy `event-management` for `/events` (required — it is the only write path for
    managed events). Deploy `events`, `og-invite`, and `whatsapp-*` only for those
@@ -257,8 +256,14 @@ Organizer Monitors Attendance.**
 - **One domain core** in `supabase/functions/_shared/event-core/` (validation,
   secure IDs/tokens, QR payload, CSV import, status transitions, authorization,
   rate limits, audit, HTTP router). The `event-management` Edge Function wires it
-  to Postgres (service role); Demo Mode runs the same router in-browser over
-  localStorage; Vitest API tests exercise the same router.
+  to Postgres (service role); Vitest API tests exercise the same router. Events
+  run **only against Supabase** — there is no Demo Mode / browser-local path, and
+  `/events` shows a setup notice when Supabase env vars are missing.
+- **Passes on request:** creating an event never issues passes. On the Guests
+  page the organizer selects guests (one row, "Select next 5", or any selection)
+  and chooses **Generate passes**. Each pass is bound to its guest (`guest_id`)
+  and stores the holder's name and role (`holder_name`, `holder_role`).
+- **Deploy:** `SUPABASE_ACCESS_TOKEN=… SUPABASE_DB_URL=… supabase/deploy-event-management.sh`.
 - **Passes:** UUID primary keys internally; display IDs like
   `INV-EVT-2026-7KQ2MX` / `INV-PASS-8F72A91C` are random (not sequential). Each
   pass has a 256-bit token. The QR encodes only `{v, eventId, passToken}` — no PII.

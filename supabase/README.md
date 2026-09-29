@@ -17,6 +17,7 @@ Apply **in order** (SQL editor or `supabase db push`):
 | 4 | `migrations/20260326000000_phase1_api.sql` | `api_rate_buckets` + `outbox_events` |
 | 5 | `migrations/20260327000000_media_2mb.sql` | Tighten existing `event-media` buckets to 2 MB |
 | 6 | `migrations/20260928000000_event_management.sql` | Event Management `em_*` tables, RLS, check-in + rate-limit RPCs |
+| 7 | `migrations/20260929000000_em_pass_holder.sql` | Pass holder name/role on `em_event_passes` |
 
 Verify locally without a Supabase project (vanilla Postgres 14+ with `psql`):
 
@@ -115,8 +116,18 @@ supabase functions deploy og-invite
 
 ### Deploy Event Management
 
+One command (applies migrations 6–7 with psql, sets secrets, deploys the function):
+
 ```bash
-supabase db push                                  # or run 20260928000000_event_management.sql in the SQL editor
+SUPABASE_ACCESS_TOKEN=sbp_… \
+SUPABASE_DB_URL='postgresql://postgres.<ref>:<db-password>@<pooler-host>:5432/postgres' \
+supabase/deploy-event-management.sh
+```
+
+Manual equivalent:
+
+```bash
+# run 20260928000000_event_management.sql then 20260929000000_em_pass_holder.sql in the SQL editor
 supabase functions deploy event-management        # default verify_jwt: anon key works for public routes
 supabase secrets set EM_MAX_CAPACITY=10000        # optional; mirror in VITE_EVENT_MAX_CAPACITY
 supabase secrets set EM_PASS_BATCH_SIZE=50        # optional; passes per generate request
