@@ -1,7 +1,7 @@
-import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 
-const controlClassName =
+export const controlClassName =
   "w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-ink outline-none ring-gold/30 transition focus:border-gold focus:ring-4 aria-[invalid=true]:border-red-400";
 
 export function Label({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
@@ -26,33 +26,4 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   return <textarea ref={ref} className={cn("min-h-[96px]", controlClassName, className)} {...props} />;
 });
 
-export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <div className="relative w-full">
-      <select
-        className={cn(
-          controlClassName,
-          "appearance-none pr-10 text-ink [color-scheme:light]",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </select>
-      <svg
-        aria-hidden
-        viewBox="0 0 20 20"
-        className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gold-dark"
-        fill="none"
-      >
-        <path
-          d="M6 8l4 4 4-4"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  );
-}
+export { Select } from "@/components/ui/Select";

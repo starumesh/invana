@@ -2,11 +2,11 @@ import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { GUEST_ROLE_LABELS, GUEST_ROLES, type GuestRole, type GuestWithPass } from "@event-core";
 import { CsvImport, GuestForm } from "@/components/events/GuestForms";
-import { ConfirmDialog, ErrorBanner, EventSubNav, LoadingBlock, Notice, PageTitle, ProgressBar, SignInRequired, StatusBadge } from "@/components/events/ui";
+import { PassActions } from "@/components/events/PassActions";
+import { ConfirmDialog, ErrorBanner, EventSubNav, LoadingBlock, Notice, PageTitle, ProgressBar, SignInRequired } from "@/components/events/ui";
 import { Button } from "@/components/ui/Button";
 import { buttonClassName } from "@/components/ui/buttonStyles";
 import { Input, Select } from "@/components/ui/Field";
-import { guestPassUrl, passWhatsAppText, whatsAppUrl, copyText } from "@/lib/eventShare";
 import { cn } from "@/lib/cn";
 import { EmApiError, errorMessage, eventsApi, generatePassesForGuests } from "@/services/eventManagement/client";
 import { useEventDetail } from "@/pages/events/useEventDetail";
@@ -68,18 +68,6 @@ export function EventGuestsPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  async function sharePass(g: GuestWithPass, via: "whatsapp" | "copy") {
-    await withBusy(async () => {
-      const s = await eventsApi.sharePass(event.id, g.id);
-      const url = guestPassUrl(s.passToken);
-      if (via === "copy") {
-        setNotice((await copyText(url)) ? `Pass link for ${g.name} copied.` : url);
-      } else {
-        window.open(whatsAppUrl(passWhatsAppText(event, g.name, url), s.phone), "_blank", "noopener");
-      }
-    }, "Unable to share this pass. Please try again.");
   }
 
   const canGetPass = (g: GuestWithPass) => !g.pass && g.status !== "CANCELLED";
@@ -150,7 +138,7 @@ export function EventGuestsPage() {
                 try {
                   setError(null);
                   await eventsApi.addGuests(event.id, [g]);
-                  setNotice(`${g.name} added. Use "Generate pass" on their row when you're ready.`);
+                  setNotice(`${g.name} added. Use "Generate Pass" on their row when you're ready.`);
                   await reload();
                   return true;
                 } catch (err) {
@@ -260,29 +248,23 @@ export function EventGuestsPage() {
                   ) : null}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">
-                      {g.name} <span className="text-sm font-normal text-ink-muted">· {GUEST_ROLE_LABELS[g.role]}</span>
+                      {g.name}
+                      {g.role !== "GUEST" ? <span className="text-sm font-normal text-ink-muted"> · {GUEST_ROLE_LABELS[g.role]}</span> : null}
                     </p>
                     <p className="truncate text-xs text-ink-muted">
                       {[g.email, g.phone, g.pass?.publicId].filter(Boolean).join(" · ") || "No contact details"}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <StatusBadge status={g.status === "INVITED" ? (g.pass ? "ISSUED" : "NO_PASS") : g.status} />
-                    {editable && canGetPass(g) ? (
-                      <Button size="sm" variant="secondary" onClick={() => void generate([g.id])} disabled={busy} aria-label={`Generate pass for ${g.name}`}>
-                        Generate pass
-                      </Button>
-                    ) : null}
-                    {g.pass && g.pass.status !== "CANCELLED" ? (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={() => void sharePass(g, "whatsapp")} aria-label={`Send pass to ${g.name} on WhatsApp`}>
-                          WhatsApp
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => void sharePass(g, "copy")} aria-label={`Copy pass link for ${g.name}`}>
-                          Copy link
-                        </Button>
-                      </>
-                    ) : null}
+                    <PassActions
+                      eventId={event.id}
+                      event={event}
+                      guest={g}
+                      editable={editable}
+                      onChanged={reload}
+                      onNotice={setNotice}
+                      onError={setError}
+                    />
                     {editable && g.status !== "CANCELLED" ? (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => setEditing(g.id)} aria-label={`Edit ${g.name}`}>

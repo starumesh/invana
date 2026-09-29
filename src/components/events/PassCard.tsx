@@ -38,8 +38,10 @@ export function PassCard({ view }: { view: GuestPassView }) {
       className="pass-card mx-auto w-full max-w-sm overflow-hidden rounded-[28px] border border-stone-200 bg-cream shadow-lift print:shadow-none"
     >
       <header className="bg-ink px-6 pb-6 pt-5 text-cream">
-        <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-gold-light">Invana · Event pass</p>
-        <h1 id="pass-event-name" className="mt-3 font-serif text-3xl leading-tight">
+        <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-gold-light">Invana · Guest pass</p>
+        <p className="mt-4 font-serif text-2xl leading-tight">{view.guest.name}</p>
+        <p className="mt-3 text-sm text-cream/70">You're invited to</p>
+        <h1 id="pass-event-name" className="mt-1 font-serif text-3xl leading-tight">
           {e.name}
         </h1>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -62,11 +64,15 @@ export function PassCard({ view }: { view: GuestPassView }) {
       <div className="px-6 pb-6 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-gold-dark">Guest</p>
-            <p className="truncate text-xl font-semibold">{view.guest.name}</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-gold-dark">Pass holder</p>
+            <p className="truncate text-base font-semibold">{view.guest.name}</p>
             {view.guest.contactHint ? <p className="text-xs text-ink-muted">Registered contact {view.guest.contactHint}</p> : null}
           </div>
-          <span aria-label={`Role: ${GUEST_ROLE_LABELS[view.guest.role]}`} className="shrink-0 rounded-full bg-gold px-3 py-1 text-sm font-semibold text-ink">{GUEST_ROLE_LABELS[view.guest.role]}</span>
+          {view.guest.role !== "GUEST" ? (
+            <span aria-label={`Role: ${GUEST_ROLE_LABELS[view.guest.role]}`} className="shrink-0 rounded-full bg-gold px-3 py-1 text-sm font-semibold text-ink">
+              {GUEST_ROLE_LABELS[view.guest.role]}
+            </span>
+          ) : null}
         </div>
         <div className={inactive ? "mt-5 opacity-30 grayscale" : "mt-5"}>
           <QrCode

@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { formatDuration, formatEventDate, formatEventTime, type StaffAssignment } from "@event-core";
 import { CalendarActions, ShareActions } from "@/components/events/ShareActions";
-import { TileMap } from "@/components/events/TileMap";
+import { LocationMap } from "@/components/events/LocationMap";
 import {
   ConfirmDialog,
   ErrorBanner,
@@ -224,9 +224,9 @@ export function EventManagePage() {
             <span className="text-ink-muted">{[event.address, event.city, event.state, event.country].filter(Boolean).join(", ")}</span>
           </p>
           <div className="mt-3">
-            <TileMap value={point} label={`Map of ${event.venueName}`} height={180} />
+            <LocationMap value={point} label={`Map of ${event.venueName}`} height={180} />
           </div>
-          <a href={openInMapsUrl(point, event.venueName)} target="_blank" rel="noreferrer" className={buttonClassName("secondary", "sm", "mt-3")}>
+          <a href={openInMapsUrl(point)} target="_blank" rel="noreferrer" className={buttonClassName("secondary", "sm", "mt-3")}>
             Open in Maps
           </a>
         </section>

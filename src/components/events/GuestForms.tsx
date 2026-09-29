@@ -27,6 +27,7 @@ export function GuestForm({
   onCancel,
   serverErrors,
   busy,
+  onDirtyChange,
 }: {
   initial?: GuestDraft;
   submitLabel: string;
@@ -34,6 +35,8 @@ export function GuestForm({
   onCancel?: () => void;
   serverErrors?: FieldErrors;
   busy?: boolean;
+  /** Reports the typed-but-not-added guest name so parents can warn before leaving. */
+  onDirtyChange?: (pendingName: string) => void;
 }) {
   const [draft, setDraft] = useState<GuestDraft>(initial);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -51,23 +54,27 @@ export function GuestForm({
     const ok = await onSubmit(result.value);
     if (ok !== false && !onCancel) {
       setDraft(EMPTY_GUEST);
+      onDirtyChange?.("");
       nameRef.current?.focus();
     }
   }
 
-  const set = (key: keyof GuestDraft) => (value: string) => setDraft((d) => ({ ...d, [key]: value }));
+  const set = (key: keyof GuestDraft) => (value: string) => {
+    setDraft((d) => ({ ...d, [key]: value }));
+    if (key === "name") onDirtyChange?.(value.trim());
+  };
 
   return (
     <form onSubmit={submit} noValidate className="grid gap-3 sm:grid-cols-2">
       <FormField label="Name" required error={shown.name}>
         {(p) => <Input {...p} ref={nameRef} value={draft.name} onChange={(e) => set("name")(e.target.value)} autoComplete="off" />}
       </FormField>
-      <FormField label="Role" error={shown.role}>
+      <FormField label="Role" hint="Optional" error={shown.role}>
         {(p) => (
           <Select {...p} value={draft.role} onChange={(e) => set("role")(e.target.value)}>
             {GUEST_ROLES.map((r) => (
               <option key={r} value={r}>
-                {GUEST_ROLE_LABELS[r]}
+                {r === "GUEST" ? "No specific role (Guest)" : GUEST_ROLE_LABELS[r]}
               </option>
             ))}
           </Select>

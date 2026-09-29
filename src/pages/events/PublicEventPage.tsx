@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatDuration, formatEventDate, formatEventTime, GUEST_ROLE_LABELS, type PublicEventView } from "@event-core";
 import { CalendarActions, ShareActions } from "@/components/events/ShareActions";
-import { TileMap } from "@/components/events/TileMap";
+import { LocationMap } from "@/components/events/LocationMap";
 import { ErrorBanner, LoadingBlock } from "@/components/events/ui";
 import { buttonClassName } from "@/components/ui/buttonStyles";
 import { eventWhatsAppText, publicEventUrl } from "@/lib/eventShare";
@@ -123,9 +123,9 @@ export function PublicEventPage() {
             <span className="text-sm text-ink-muted">{fullAddress}</span>
           </p>
           <div className="mt-4">
-            <TileMap value={point} label={`Map of ${event.venueName}`} height={240} />
+            <LocationMap value={point} label={`Map of ${event.venueName}`} height={240} />
           </div>
-          <a href={openInMapsUrl(point, event.venueName)} target="_blank" rel="noreferrer" className={buttonClassName("gold", "md", "mt-4")}>
+          <a href={openInMapsUrl(point)} target="_blank" rel="noreferrer" className={buttonClassName("gold", "md", "mt-4")}>
             Open in Maps
           </a>
         </section>

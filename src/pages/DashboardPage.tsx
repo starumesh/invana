@@ -132,7 +132,7 @@ export function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-serif text-4xl">My events</h1>
+          <h1 className="font-serif text-4xl">My Invitations</h1>
           <p className="mt-2 text-ink-muted">Open, publish, and share your invitations and cards.</p>
         </div>
         <Link to="/create">

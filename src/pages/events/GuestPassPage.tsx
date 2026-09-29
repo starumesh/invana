@@ -103,7 +103,7 @@ export function GuestPassPage() {
             }}
           />
           <div className="flex flex-wrap gap-2 pt-2">
-            <a href={openInMapsUrl(point, e.venueName)} target="_blank" rel="noreferrer" className={buttonClassName("secondary", "sm")}>
+            <a href={openInMapsUrl(point)} target="_blank" rel="noreferrer" className={buttonClassName("secondary", "sm")}>
               Open in Maps
             </a>
             {e.slug ? (

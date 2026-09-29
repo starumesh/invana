@@ -50,7 +50,7 @@ export function getCardType(id?: CardTypeId | string | null): CardTypeMeta | und
   return CARD_TYPES.find((type) => type.id === normalized);
 }
 
-/** Short label for My events / builder chrome. */
+/** Short label for My Invitations / builder chrome. */
 export function cardKindLabel(cardType?: CardTypeId | string | null): string {
   if (isBioCardType(cardType)) return "Bio Data";
   return getCardType(cardType)?.name ?? "Card";

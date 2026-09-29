@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildIcs, googleCalendarUrl, outlookCalendarUrl, REMINDER_OFFSETS } from "@/lib/calendar";
 import { eventWhatsAppText, passWhatsAppText, whatsAppUrl } from "@/lib/eventShare";
-import { lngLatToWorld, openInMapsUrl, worldToLngLat } from "@/lib/maps";
+import { openInMapsUrl } from "@/lib/maps";
 
 const event = {
   name: "Tech Meetup",
@@ -60,17 +60,7 @@ describe("sharing", () => {
 });
 
 describe("maps", () => {
-  it("round-trips lat/lng through web-mercator pixels", () => {
-    const p = { lat: 17.4435, lng: 78.3772 };
-    const w = lngLatToWorld(p, 15);
-    const back = worldToLngLat(w.x, w.y, 15);
-    expect(back.lat).toBeCloseTo(p.lat, 4);
-    expect(back.lng).toBeCloseTo(p.lng, 4);
-  });
-
   it("opens maps at the pin", () => {
-    expect(openInMapsUrl({ lat: 17.4, lng: 78.3 }, "T-Hub")).toBe(
-      "https://www.google.com/maps/search/?api=1&query=17.4%2C78.3%20(T-Hub)",
-    );
+    expect(openInMapsUrl({ lat: 17.4, lng: 78.3 })).toBe("https://www.google.com/maps/search/?api=1&query=17.4,78.3");
   });
 });

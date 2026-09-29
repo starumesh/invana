@@ -151,7 +151,7 @@ export function metaForPath(pathname: string): PageMeta {
 
   if (path === "/dashboard") {
     return {
-      title: `My Events | ${SITE_NAME}`,
+      title: `My Invitations | ${SITE_NAME}`,
       description:
         "Manage your digital invitations, biodata cards, RSVPs, and WhatsApp invite shares in one place.",
       keywords: DEFAULT_KEYWORDS,

@@ -98,7 +98,7 @@ workflow runs lint, type-check, and build on `main`/`master`; it does not run on
 4. **Download** — PNG / PDF (Connected: durable HTTPS photos after sign-in)  
 5. **Publish** — public `/invite/:slug` RSVP site  
 6. **Share** — WhatsApp (`wa.me` or Cloud API)  
-7. **RSVP** — guests respond; host sees them on **My events**
+7. **RSVP** — guests respond; host sees them on **My Invitations**
 
 ### Routes
 

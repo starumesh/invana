@@ -46,7 +46,7 @@ export async function passSvg(view: GuestPassView): Promise<string> {
     )
     .join("");
   const e = view.event;
-  const nameLines = wrap(e.name, 26, 2);
+  const nameLines = wrap(e.name, 30, 1);
   const venue = [e.venueName, e.city].filter(Boolean).join(", ");
   const text = (x: number, y: number, size: number, value: string, opts = "") =>
     `<text x="${x}" y="${y}" font-size="${size}" ${opts}>${esc(value)}</text>`;
@@ -55,14 +55,16 @@ export async function passSvg(view: GuestPassView): Promise<string> {
   <rect width="${W}" height="${H}" rx="48" fill="#faf7f2"/>
   <rect width="${W}" height="560" rx="48" fill="#1c1917"/>
   <rect y="500" width="${W}" height="60" fill="#1c1917"/>
-  ${text(80, 120, 34, "INVANA · EVENT PASS", 'fill="#d4b896" letter-spacing="6"')}
-  ${nameLines.map((l, i) => text(80, 220 + i * 78, 68, l, 'fill="#faf7f2" font-family="Georgia, serif"')).join("")}
+  ${text(80, 110, 30, "INVANA · GUEST PASS", 'fill="#d4b896" letter-spacing="6"')}
+  ${text(80, 180, 52, view.guest.name.slice(0, 28), 'fill="#faf7f2" font-family="Georgia, serif"')}
+  ${text(80, 232, 30, "You're invited to", 'fill="#e8dccb" opacity="0.75"')}
+  ${nameLines.map((l, i) => text(80, 300 + i * 64, 56, l, 'fill="#faf7f2" font-family="Georgia, serif"')).join("")}
   ${text(80, 400, 36, `${formatEventDate(e.startDatetime, e.timezone)} · ${formatEventTime(e.startDatetime, e.timezone)}`, 'fill="#e8dccb"')}
   ${text(80, 460, 32, venue.slice(0, 48), 'fill="#e8dccb" opacity="0.8"')}
-  ${text(80, 650, 28, "GUEST", 'fill="#8c6d45" letter-spacing="4"')}
+  ${text(80, 650, 28, "PASS HOLDER", 'fill="#8c6d45" letter-spacing="4"')}
   ${text(80, 715, 56, view.guest.name.slice(0, 30), 'fill="#1c1917" font-weight="600"')}
-  <rect x="${W - 80 - 280}" y="628" width="280" height="72" rx="36" fill="#b8956a"/>
-  ${text(W - 80 - 140, 676, 32, GUEST_ROLE_LABELS[view.guest.role], 'fill="#1c1917" text-anchor="middle" font-weight="600"')}
+  ${view.guest.role !== "GUEST" ? `<rect x="${W - 80 - 280}" y="628" width="280" height="72" rx="36" fill="#b8956a"/>
+  ${text(W - 80 - 140, 676, 32, GUEST_ROLE_LABELS[view.guest.role], 'fill="#1c1917" text-anchor="middle" font-weight="600"')}` : ""}
   <rect x="${qrX}" y="${qrY}" width="${qrSize}" height="${qrSize}" rx="24" fill="#ffffff" stroke="#e8dccb" stroke-width="4"/>
   <g fill="#1c1917">${qrRects}</g>
   ${text(W / 2, 1530, 44, view.pass.publicId, 'fill="#1c1917" text-anchor="middle" font-family="Menlo, monospace" font-weight="600"')}
