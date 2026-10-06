@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/Button";
 
 const links = [
   { to: "/templates", label: "Templates" },
-  { to: "/events", label: "My Invitations" },
-  { to: "/dashboard", label: "My Designs" },
+  { to: "/dashboard", label: "Invitations" },
+  { to: "/events", label: "Events" },
 ];
 
 export function Shell() {
@@ -15,11 +15,11 @@ export function Shell() {
   return (
     <div className="min-h-screen bg-cream text-ink">
       <header className="sticky top-0 z-40 border-b border-stone-200/70 bg-cream/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
-          <Link to="/" className="font-serif text-2xl tracking-tight transition hover:text-gold-dark">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:gap-4">
+          <Link to="/" className="shrink-0 font-serif text-xl tracking-tight transition sm:text-2xl hover:text-gold-dark">
             Invana
           </Link>
-          <div className="flex min-w-0 items-center gap-3 md:gap-5">
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3 md:gap-5">
             <nav className="flex min-w-0 items-center gap-3 overflow-x-auto text-sm text-ink-muted md:gap-6">
               {links.map((link) => (
                 <NavLink
@@ -74,11 +74,11 @@ export function Shell() {
             <Link to="/templates" className="hover:text-ink">
               Templates
             </Link>
-            <Link to="/events" className="hover:text-ink">
-              My Invitations
-            </Link>
             <Link to="/dashboard" className="hover:text-ink">
-              My Designs
+              Invitations
+            </Link>
+            <Link to="/events" className="hover:text-ink">
+              Events
             </Link>
             <Link to="/signin" className="hover:text-ink">
               Sign in

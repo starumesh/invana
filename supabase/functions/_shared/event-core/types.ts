@@ -247,7 +247,7 @@ export type GuestQuery = {
 
 export type GuestPage = { rows: GuestRow[]; total: number; limit: number; offset: number };
 
-/** Only what the My Invitations list renders. */
+/** Only what the My Events list renders. */
 export type EventListItem = Pick<
   ManagedEvent,
   "id" | "publicId" | "name" | "eventType" | "startDatetime" | "timezone" | "durationMinutes" | "venueName" | "city" | "status" | "slug" | "maxCapacity" | "createdAt"

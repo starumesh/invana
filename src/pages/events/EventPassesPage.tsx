@@ -53,7 +53,7 @@ export function EventPassesPage() {
       </section>
 
       <div className="mt-6 space-y-3">
-        {event.status === "DRAFT" ? <Notice tone="warn">Passes can be shared now, but check-in only works after you publish the invitation.</Notice> : null}
+        {event.status === "DRAFT" ? <Notice tone="warn">Passes can be shared now, but check-in only works after you publish the event.</Notice> : null}
         {notice ? <Notice tone="success">{notice}</Notice> : null}
         <ErrorBanner message={error} />
       </div>

@@ -276,7 +276,7 @@ export function EventWizardPage() {
           }
         }
       } catch (err) {
-        if (!cancelled) setBanner(errorMessage(err, "Unable to load this invitation. Please try again."));
+        if (!cancelled) setBanner(errorMessage(err, "Unable to load this event. Please try again."));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -379,7 +379,7 @@ export function EventWizardPage() {
       }
       return draft.eventId;
     } catch (err) {
-      applyServerError(err, "Unable to save the invitation. Please check the required fields.");
+      applyServerError(err, "Unable to save the event. Please check the required fields.");
       return null;
     }
   }
@@ -421,8 +421,8 @@ export function EventWizardPage() {
     navigate(`/events/${id}/manage`, {
       state: {
         notice: editing
-          ? "Invitation updated."
-          : `Invitation created with ${activeGuests.length} guest${activeGuests.length === 1 ? "" : "s"}. Generate passes for your guests, then publish and share.`,
+          ? "Event updated."
+          : `Event created with ${activeGuests.length} guest${activeGuests.length === 1 ? "" : "s"}. Generate passes for your guests, then publish and share.`,
       },
     });
   }
@@ -448,7 +448,7 @@ export function EventWizardPage() {
 
   if (!ready) return <main className="mx-auto max-w-5xl px-4 py-12"><LoadingBlock /></main>;
   if (!signedIn) return <SignInRequired />;
-  if (loading) return <main className="mx-auto max-w-5xl px-4 py-12"><LoadingBlock label="Loading your invitation…" /></main>;
+  if (loading) return <main className="mx-auto max-w-5xl px-4 py-12"><LoadingBlock label="Loading your event…" /></main>;
 
   const startIso = zonedToUtcIso(draft.date, draft.startTime, draft.timezone);
   const point = draft.latitude !== null && draft.longitude !== null ? { lat: draft.latitude, lng: draft.longitude } : null;
@@ -456,7 +456,7 @@ export function EventWizardPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 pb-32">
-      <PageTitle eyebrow={editing ? "Edit invitation" : "My Invitations · New"} title={editing ? draft.name || "Edit invitation" : "Create an invitation"}>
+      <PageTitle eyebrow={editing ? "Edit event" : "My Events · New"} title={editing ? draft.name || "Edit event" : "Create event"}>
         <Link to={editing ? `/events/${routeEventId}/manage` : "/events"} className={buttonClassName("ghost", "sm")}>
           Cancel
         </Link>
@@ -486,7 +486,7 @@ export function EventWizardPage() {
       {restoredAt && !editing ? (
         <div className="mt-6">
           <Notice>
-            Restored your invitation in progress from {new Date(restoredAt).toLocaleString()}.{" "}
+            Restored your event in progress from {new Date(restoredAt).toLocaleString()}.{" "}
             <button
               type="button"
               className="font-medium text-ink underline"
@@ -500,7 +500,7 @@ export function EventWizardPage() {
             >
               Start over
             </button>
-            {draft.eventId ? " (the saved draft stays in My Invitations)" : ""}
+            {draft.eventId ? " (the saved draft stays in My Events)" : ""}
           </Notice>
         </div>
       ) : null}
@@ -517,12 +517,12 @@ export function EventWizardPage() {
           {step === "Venue & Map" && "Venue & map"}
           {step === "Timeline" && "Event timeline"}
           {step === "Guests" && "Guests"}
-          {step === "Review" && "Review your invitation"}
+          {step === "Review" && "Review your event"}
         </h2>
 
         {step === "Details" ? (
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <FormField label="Invitation / event name" required error={errors.name} className="sm:col-span-2">
+            <FormField label="Event name" required error={errors.name} className="sm:col-span-2">
               {(p) => <Input {...p} value={draft.name} onChange={(e) => update("name", e.target.value)} maxLength={120} placeholder="Arjun & Priya's Wedding" />}
             </FormField>
             <FormField label="Event category" required>
@@ -671,7 +671,7 @@ export function EventWizardPage() {
                     Save Draft
                   </Button>
                   <Button type="button" variant="gold" onClick={() => void finish("create")} disabled={busy}>
-                    {busy ? "Creating…" : "Create Invitation"}
+                    {busy ? "Creating…" : "Create Event"}
                   </Button>
                 </>
               )
@@ -1290,7 +1290,7 @@ function GuestsStep({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink-muted">No guests yet. You can also add guests later from the invitation's Guests page.</p>
+        <p className="text-sm text-ink-muted">No guests yet. You can also add guests later from the event's Guests page.</p>
       )}
 
       <ConfirmDialog

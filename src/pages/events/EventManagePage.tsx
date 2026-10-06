@@ -16,13 +16,13 @@ type Action = "publish" | "unpublish" | "cancel" | "complete";
 
 const ACTION_COPY: Record<Action, { title: string; body: string; label: string; done: string }> = {
   publish: {
-    title: "Publish this invitation?",
-    body: "A public invitation page goes live and guest passes become valid for check-in.",
+    title: "Publish this event?",
+    body: "A public event page goes live and guest passes become valid for check-in.",
     label: "Publish",
     done: "Published! Your public page is live — use Share to send it.",
   },
   unpublish: {
-    title: "Unpublish this invitation?",
+    title: "Unpublish this event?",
     body: "The public page goes offline and check-in pauses. Guest passes are kept and work again when you re-publish.",
     label: "Unpublish",
     done: "Unpublished. It's a draft again.",
@@ -35,13 +35,13 @@ const ACTION_COPY: Record<Action, { title: string; body: string; label: string; 
   },
   complete: {
     title: "Mark as completed?",
-    body: "Check-in closes and the invitation moves to your past invitations. Attendance stays available.",
+    body: "Check-in closes and the event moves to your past events. Attendance stays available.",
     label: "Mark completed",
     done: "Marked as completed.",
   },
 };
 
-/** Invitation overview: one action bar, then read-only summaries (no repeated buttons). */
+/** Event overview: one action bar, then read-only summaries (no repeated buttons). */
 export function EventManagePage() {
   const { eventId = "" } = useParams();
   const location = useLocation();
@@ -61,7 +61,7 @@ export function EventManagePage() {
       setData(await eventsApi.overview(eventId));
       setError(null);
     } catch (err) {
-      setError(errorMessage(err, "Unable to load this invitation. Please try again."));
+      setError(errorMessage(err, "Unable to load this event. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -84,13 +84,13 @@ export function EventManagePage() {
   }, [moreOpen]);
 
   if (ready && !signedIn) return <SignInRequired />;
-  if (!ready || loading) return <main className="mx-auto max-w-6xl px-4 py-12"><LoadingBlock label="Loading invitation…" /></main>;
+  if (!ready || loading) return <main className="mx-auto max-w-6xl px-4 py-12"><LoadingBlock label="Loading event…" /></main>;
   if (!data) {
     return (
       <main className="mx-auto max-w-6xl px-4 py-12">
         <ErrorBanner message={error ?? "You don't have permission to access this event."} onRetry={() => void reload()} />
         <Link to="/events" className={buttonClassName("secondary", "sm", "mt-6")}>
-          Back to My Invitations
+          Back to My Events
         </Link>
       </main>
     );
@@ -110,7 +110,7 @@ export function EventManagePage() {
       setNotice(ACTION_COPY[action].done);
       if (action === "publish") setShareOpen(true);
     } catch (err) {
-      setError(errorMessage(err, "Unable to update the invitation status. Please try again."));
+      setError(errorMessage(err, "Unable to update the event status. Please try again."));
     } finally {
       setBusy(false);
       setPending(null);
@@ -127,7 +127,7 @@ export function EventManagePage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
       <Link to="/events" className="text-sm text-ink-muted hover:text-ink">
-        ← My Invitations
+        ← My Events
       </Link>
       <div className="mt-3">
         <PageTitle eyebrow={event.publicId} title={event.name}>
@@ -139,7 +139,7 @@ export function EventManagePage() {
         {event.venueName}, {event.city}
       </p>
 
-      <nav aria-label="Invitation actions" className="sticky top-16 z-20 -mx-4 mt-6 border-y border-stone-200 bg-cream/95 px-4 py-3 backdrop-blur">
+      <nav aria-label="Event actions" className="sticky top-16 z-20 -mx-4 mt-6 border-y border-stone-200 bg-cream/95 px-4 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center gap-2">
           {editable ? (
             <Link to={`/events/${event.id}/edit`} className={buttonClassName("secondary", "sm")}>
@@ -194,7 +194,7 @@ export function EventManagePage() {
       </nav>
 
       {shareOpen ? (
-        <section id="share-panel" aria-label="Share invitation" className="mt-4 rounded-3xl border border-gold/40 bg-white p-5 shadow-sm">
+        <section id="share-panel" aria-label="Share event" className="mt-4 rounded-3xl border border-gold/40 bg-white p-5 shadow-sm">
           {url ? (
             <>
               <p className="break-all rounded-xl bg-cream px-3 py-2 font-mono text-sm">
@@ -217,10 +217,10 @@ export function EventManagePage() {
                   uid: event.id,
                 }}
               />
-              <p className="mt-3 text-xs text-ink-muted">This is the public invitation. Each guest's personal pass is shared from Manage Guests.</p>
+              <p className="mt-3 text-xs text-ink-muted">This is the public event page. Each guest's personal pass is shared from Manage Guests.</p>
             </>
           ) : (
-            <p className="text-sm text-ink-muted">Publish the invitation to get a public link you can share on WhatsApp.</p>
+            <p className="text-sm text-ink-muted">Publish the event to get a public link you can share on WhatsApp.</p>
           )}
         </section>
       ) : null}

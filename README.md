@@ -98,7 +98,7 @@ workflow runs lint, type-check, and build on `main`/`master`; it does not run on
 4. **Download** — PNG / PDF (Connected: durable HTTPS photos after sign-in)  
 5. **Publish** — public `/invite/:slug` RSVP site  
 6. **Share** — WhatsApp (`wa.me` or Cloud API)  
-7. **RSVP** — guests respond; host sees them on **My Invitations**
+7. **RSVP** — guests respond; host sees them on **My Invitations** (`/dashboard`)
 
 ### Routes
 
@@ -108,10 +108,10 @@ workflow runs lint, type-check, and build on `main`/`master`; it does not run on
 | `/templates` | Browse the full template catalog |
 | `/create`, `/create/:eventType`, `/create/card` | Select invitation/card type and template |
 | `/builder/:id` | Edit content/theme, preview, save, and export |
-| `/dashboard` | Saved events, publish/share/download, and RSVP filters |
+| `/dashboard` | **Invitations** ("My Invitations"): saved designs, publish/share/download, and RSVP filters |
 | `/signin` | Connected Mode sign-in/sign-up; Demo Mode setup guidance |
 | `/invite/:slug` | Public invitation and RSVP form (outside the app shell) |
-| `/events` | Managed events (organizer + assigned staff) |
+| `/events` | **Events** ("My Events"): managed events (organizer + assigned staff) |
 | `/events/create`, `/events/:eventId/edit` | Multi-step event wizard |
 | `/events/:eventId/manage` | Event dashboard: publish, share, staff, stats |
 | `/events/:eventId/guests`, `/events/:eventId/passes` | Guest list, CSV import, pass sharing |
