@@ -72,10 +72,10 @@ export async function handleEventRequest(service: EventService, req: Request, ct
       if (m !== "GET") return respond({ error: "Method not allowed." }, 405);
       if (p[1] === "events" && p[2] && p.length === 3) return respond({ event: await service.getPublicEvent(ctx, p[2]) });
       if (p[1] === "passes" && p[2] && p.length === 3) return respond(await service.getGuestPass(ctx, p[2]));
-      return respond({ error: "Not found." }, 404);
+      return respond({ error: "Not found.", code: "NOT_FOUND" }, 404);
     }
 
-    if (p[0] !== "events") return respond({ error: "Not found." }, 404);
+    if (p[0] !== "events") return respond({ error: "Not found.", code: "NOT_FOUND" }, 404);
 
     if (p.length === 1) {
       if (m === "GET") {
@@ -93,7 +93,7 @@ export async function handleEventRequest(service: EventService, req: Request, ct
     }
 
     const id = p[1];
-    if (!id) return respond({ error: "Not found." }, 404);
+    if (!id) return respond({ error: "Not found.", code: "NOT_FOUND" }, 404);
 
     if (p.length === 2) {
       if (m === "GET") return respond(await service.getEventDetail(ctx, id));
@@ -184,7 +184,7 @@ export async function handleEventRequest(service: EventService, req: Request, ct
       }
     }
 
-    return respond({ error: "Not found." }, 404);
+    return respond({ error: "Not found.", code: "NOT_FOUND" }, 404);
   } catch (err) {
     if (isEventError(err)) {
       return respond(
