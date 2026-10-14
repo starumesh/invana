@@ -284,7 +284,7 @@ export function BuilderPage() {
               <>
                 Download PNG or PDF from the preview. Cards stay private — find them in{" "}
                 <Link to="/dashboard" className="font-medium text-gold-dark underline">
-                  My Designs
+                  My Invitations
                 </Link>
                 .
               </>
@@ -292,7 +292,7 @@ export function BuilderPage() {
               <>
                 Ready to go live? Publish and share from{" "}
                 <Link to="/dashboard" className="font-medium text-gold-dark underline">
-                  My Designs
+                  My Invitations
                 </Link>
                 .
               </>

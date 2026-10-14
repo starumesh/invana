@@ -132,8 +132,8 @@ export function DashboardPage() {
     <main className="mx-auto max-w-6xl px-4 py-12">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-serif text-4xl">My Designs</h1>
-          <p className="mt-2 text-ink-muted">Invitation designs, cards, and RSVP sites — open, publish, and share them. Guest passes and check-in live in My Invitations.</p>
+          <h1 className="font-serif text-4xl">My Invitations</h1>
+          <p className="mt-2 text-ink-muted">Invitation designs, cards, and RSVP sites — open, publish, and share them. Guest passes and check-in live in Events.</p>
         </div>
         <Link to="/create">
           <Button variant="gold">Create invitation</Button>
@@ -147,13 +147,13 @@ export function DashboardPage() {
       {loading ? (
         <div className="mt-10 rounded-3xl border border-stone-200 bg-white/70 px-6 py-14 text-center">
           <div className="mx-auto h-9 w-9 rounded-full border-2 border-gold/40 border-t-gold animate-soft-pulse" />
-          <p className="mt-4 text-ink-muted">Loading your events…</p>
+          <p className="mt-4 text-ink-muted">Loading your invitations…</p>
         </div>
       ) : null}
 
       {!loading && !rows.length ? (
         <div className="mt-10 rounded-3xl border border-dashed border-stone-300 bg-white px-6 py-14 text-center">
-          <h2 className="font-serif text-2xl">No events yet</h2>
+          <h2 className="font-serif text-2xl">No invitations yet</h2>
           <p className="mt-2 text-ink-muted">Start with an invitation — you can publish and share it from here.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link to="/create">

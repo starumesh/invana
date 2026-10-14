@@ -56,7 +56,7 @@ export interface EventRepository {
   listEventsByOwner(userId: string): Promise<ManagedEvent[]>;
   listEventsByIds(ids: string[]): Promise<ManagedEvent[]>;
   countsForEvents(ids: string[]): Promise<Map<string, RawEventCounts>>;
-  /** One round trip for the My Invitations list: owned + assigned (non-draft) events, newest first. */
+  /** One round trip for the My Events list: owned + assigned (non-draft) events, newest first. */
   listEventSummaries(input: {
     userId: string;
     email: string | null;

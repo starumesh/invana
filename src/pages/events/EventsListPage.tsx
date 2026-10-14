@@ -42,7 +42,7 @@ export function EventsListPage() {
       setNextCursor(page.nextCursor);
       sessionStorage.setItem(CACHE_KEY, JSON.stringify({ userId, rows: page.events, nextCursor: page.nextCursor, at: Date.now() } satisfies Cached));
     } catch (err) {
-      setError(errorMessage(err, "Unable to load your invitations. Please try again."));
+      setError(errorMessage(err, "Unable to load your events. Please try again."));
       setRows((r) => r ?? []);
     } finally {
       setRefreshing(false);
@@ -67,7 +67,7 @@ export function EventsListPage() {
       setRows((r) => [...(r ?? []), ...page.events.filter((e) => !(r ?? []).some((x) => x.event.id === e.event.id))]);
       setNextCursor(page.nextCursor);
     } catch (err) {
-      setError(errorMessage(err, "Unable to load more invitations."));
+      setError(errorMessage(err, "Unable to load more events."));
     } finally {
       setLoadingMore(false);
     }
@@ -77,9 +77,9 @@ export function EventsListPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12">
-      <PageTitle eyebrow="Guests, passes & check-in" title="My Invitations">
+      <PageTitle eyebrow="Guests, passes & check-in" title="My Events">
         <Link to="/events/create" className={buttonClassName("gold")}>
-          Create invitation
+          Create event
         </Link>
       </PageTitle>
       <p className="mt-2 flex items-center gap-2 text-ink-muted">
@@ -93,7 +93,7 @@ export function EventsListPage() {
       </div>
 
       {rows === null ? (
-        <ul className="mt-8 grid gap-4 md:grid-cols-2" aria-label="Loading invitations" aria-busy="true">
+        <ul className="mt-8 grid gap-4 md:grid-cols-2" aria-label="Loading events" aria-busy="true">
           {Array.from({ length: 4 }, (_, i) => (
             <li key={i} className="h-44 animate-soft-pulse rounded-3xl border border-stone-200 bg-white" />
           ))}
@@ -102,10 +102,10 @@ export function EventsListPage() {
 
       {rows && !rows.length && !error ? (
         <div className="mt-10 rounded-3xl border border-dashed border-stone-300 bg-white px-6 py-14 text-center">
-          <h2 className="font-serif text-2xl">No invitations yet</h2>
-          <p className="mt-2 text-ink-muted">Create an invitation, add guests, and give each guest a secure QR pass.</p>
+          <h2 className="font-serif text-2xl">No events yet</h2>
+          <p className="mt-2 text-ink-muted">Create an event, add guests, and give each guest a secure QR pass.</p>
           <Link to="/events/create" className={buttonClassName("gold", "md", "mt-6")}>
-            Create your first invitation
+            Create your first event
           </Link>
         </div>
       ) : null}

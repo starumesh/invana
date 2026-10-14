@@ -101,7 +101,7 @@ export function EventCheckInPage() {
       <main className="mx-auto max-w-lg px-4 py-10">
         <ErrorBanner message={loadError} onRetry={() => void loadContext()} />
         <Link to="/events" className="mt-4 inline-block text-sm underline">
-          Back to My Invitations
+          Back to My Events
         </Link>
       </main>
     );

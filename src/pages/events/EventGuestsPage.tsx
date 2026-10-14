@@ -31,7 +31,7 @@ export function EventGuestsPage() {
     try {
       setOverview(await eventsApi.overview(eventId));
     } catch (err) {
-      setError(errorMessage(err, "Unable to load this invitation. Please try again."));
+      setError(errorMessage(err, "Unable to load this event. Please try again."));
     }
   }, [eventId]);
 

@@ -268,7 +268,7 @@ export class EventService {
   // Events
   // -------------------------------------------------------------------------
 
-  /** My Invitations list: summary fields + counts only, newest first, cursor-paginated. */
+  /** My Events list: summary fields + counts only, newest first, cursor-paginated. */
   async listMyEvents(ctx: RequestContext, opts: { limit?: unknown; cursor?: unknown } = {}): Promise<EventListPage> {
     const actor = this.requireActor(ctx);
     const limit = Math.min(Math.max(1, Math.floor(Number(opts.limit) || 24)), 100);
