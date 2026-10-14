@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { messagesFor } from "@/config/welcome-messages";
 import { Input, Label, Select, Textarea } from "@/components/ui/Field";
+import { cn } from "@/lib/cn";
 import { ImageOptimizeError } from "@/lib/imageOptimize";
 import { demoStorage } from "@/services/demoStorage";
 import type { DateValue, EventTypeId, FieldSpec, TimeValue } from "@/types";
@@ -27,13 +28,17 @@ export function DynamicFields({ fields, values, eventType, eventId, onChange }: 
 
   return (
     <div className="space-y-8">
-      {groups.map(([group, specs]) => {
+      {groups.map(([group, specs], groupIndex) => {
         const imageSpecs = specs.filter((spec) => spec.type === "image");
         const isPhotoSection = PHOTO_GROUPS.has(group) && imageSpecs.length > 0;
         const multiPhoto = isPhotoSection && imageSpecs.length > 1;
 
         return (
-          <section key={group} className="space-y-3 animate-fade-up">
+          <section
+            key={group}
+            className="relative space-y-3"
+            style={{ zIndex: (groups.length - groupIndex) * 10 }}
+          >
             <div>
               <h3 className="font-serif text-xl text-ink">{group}</h3>
               {isPhotoSection ? <p className="mt-1 text-sm text-ink-muted">{COVER_CROP_HINT}</p> : null}
@@ -43,14 +48,18 @@ export function DynamicFields({ fields, values, eventType, eventId, onChange }: 
                 multiPhoto ? "grid gap-3 sm:grid-cols-2" : "grid gap-4 sm:grid-cols-2"
               }
             >
-              {specs.map((spec) => {
+              {specs.map((spec, specIndex) => {
                 const isImage = spec.type === "image";
                 const spanFull =
                   !multiPhoto &&
                   (spec.type === "textarea" || spec.type === "message" || isImage);
 
                 return (
-                  <div key={spec.key} className={spanFull ? "sm:col-span-2" : ""}>
+                  <div
+                    key={spec.key}
+                    className={cn(spanFull ? "sm:col-span-2" : "", "relative")}
+                    style={{ zIndex: (specs.length - specIndex) * 5 }}
+                  >
                     <FieldControl
                       spec={spec}
                       value={values[spec.key]}
@@ -68,7 +77,7 @@ export function DynamicFields({ fields, values, eventType, eventId, onChange }: 
       })}
 
       {optional.length ? (
-        <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white/70">
+        <section className="relative z-0 overflow-hidden rounded-2xl border border-stone-200 bg-white/70">
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
@@ -85,10 +94,14 @@ export function DynamicFields({ fields, values, eventType, eventId, onChange }: 
           </button>
           {moreOpen ? (
             <div className="grid gap-4 border-t border-stone-100 px-5 py-5 sm:grid-cols-2">
-              {optional.map((spec) => (
+              {optional.map((spec, specIndex) => (
                 <div
                   key={spec.key}
-                  className={spec.type === "textarea" || spec.type === "image" ? "sm:col-span-2" : ""}
+                  className={cn(
+                    spec.type === "textarea" || spec.type === "image" ? "sm:col-span-2" : "",
+                    "relative",
+                  )}
+                  style={{ zIndex: (optional.length - specIndex) * 5 }}
                 >
                   <FieldControl
                     spec={spec}
@@ -293,47 +306,14 @@ function FieldControl({
   }
 
   if (spec.type === "message") {
-    const options = messagesFor(eventType);
-    const current = typeof value === "string" ? value : "";
-    const selectValue = options.includes(current) ? current : current ? "__custom__" : "";
     return (
-      <div className="space-y-3">
-        <div>
-          <Label htmlFor={id}>
-            {spec.label}
-            {spec.required ? " *" : ""}
-          </Label>
-          <Select
-            id={id}
-            value={selectValue}
-            onChange={(e) => {
-              if (e.target.value === "") {
-                onChange(spec.key, "");
-              } else if (e.target.value === "__custom__") {
-                onChange(spec.key, options.includes(current) ? "" : current);
-              } else {
-                onChange(spec.key, e.target.value);
-              }
-            }}
-          >
-            <option value="">Select a message…</option>
-            {options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-            <option value="__custom__">Write your own…</option>
-          </Select>
-        </div>
-        {selectValue === "__custom__" ? (
-          <Textarea
-            value={current}
-            maxLength={spec.maxLength ?? 220}
-            onChange={(e) => onChange(spec.key, e.target.value)}
-            placeholder="Write a short welcome message"
-          />
-        ) : null}
-      </div>
+      <WelcomeMessageField
+        id={id}
+        spec={spec}
+        value={value}
+        eventType={eventType}
+        onChange={onChange}
+      />
     );
   }
 
@@ -400,6 +380,79 @@ function FieldControl({
         required={spec.required}
         onChange={(e) => onChange(spec.key, e.target.value)}
       />
+    </div>
+  );
+}
+
+function WelcomeMessageField({
+  id,
+  spec,
+  value,
+  eventType,
+  onChange,
+}: {
+  id: string;
+  spec: FieldSpec;
+  value: unknown;
+  eventType?: EventTypeId;
+  onChange: (key: string, value: unknown) => void;
+}) {
+  const options = messagesFor(eventType);
+  const current = typeof value === "string" ? value : "";
+  const isPreset = options.includes(current);
+  const [isCustom, setIsCustom] = useState(() => Boolean(current) && !isPreset);
+
+  useEffect(() => {
+    if (isPreset) {
+      setIsCustom(false);
+    } else if (current) {
+      setIsCustom(true);
+    }
+  }, [current, isPreset]);
+
+  const selectValue = isCustom ? "__custom__" : isPreset ? current : "";
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <Label htmlFor={id}>
+          {spec.label}
+          {spec.required ? " *" : ""}
+        </Label>
+        <Select
+          id={id}
+          value={selectValue}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next === "__custom__") {
+              setIsCustom(true);
+            } else if (next === "") {
+              setIsCustom(false);
+              onChange(spec.key, "");
+            } else {
+              setIsCustom(false);
+              onChange(spec.key, next);
+            }
+          }}
+        >
+          <option value="">Select a message…</option>
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+          <option value="__custom__">Write your own…</option>
+        </Select>
+      </div>
+      {isCustom ? (
+        <Textarea
+          value={current}
+          maxLength={spec.maxLength ?? 220}
+          onChange={(e) => onChange(spec.key, e.target.value)}
+          placeholder="Write a short welcome message"
+          autoFocus
+        />
+      ) : null}
     </div>
   );
 }

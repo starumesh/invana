@@ -72,5 +72,5 @@ export const WELCOME_MESSAGES: Record<EventTypeId, string[]> = {
 };
 
 export function messagesFor(eventType?: EventTypeId): string[] {
-  return eventType ? WELCOME_MESSAGES[eventType] : SHARED;
+  return (eventType && WELCOME_MESSAGES[eventType]) ? WELCOME_MESSAGES[eventType] : SHARED;
 }

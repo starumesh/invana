@@ -76,22 +76,30 @@ export function Select({ value, defaultValue, onChange, children, className, id,
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const typeahead = useRef({ text: "", at: 0 });
+  const fromKeyboard = useRef(false);
   const autoId = useId();
   const buttonId = id ?? `${autoId}-button`;
   const listId = `${autoId}-list`;
 
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => {
+    const onDown = (e: MouseEvent | TouchEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    listRef.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
+    if (fromKeyboard.current) {
+      listRef.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
+      fromKeyboard.current = false;
+    }
   }, [open, active]);
 
   function commit(index: number) {
@@ -105,6 +113,7 @@ export function Select({ value, defaultValue, onChange, children, className, id,
 
   function openList() {
     if (disabled) return;
+    fromKeyboard.current = true;
     setActive(Math.max(0, options.findIndex((o) => o.value === current)));
     setOpen(true);
   }
@@ -124,15 +133,19 @@ export function Select({ value, defaultValue, onChange, children, className, id,
     if (!open) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      fromKeyboard.current = true;
       setActive((a) => step(a, 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
+      fromKeyboard.current = true;
       setActive((a) => step(a, -1));
     } else if (e.key === "Home") {
       e.preventDefault();
+      fromKeyboard.current = true;
       setActive(step(-1, 1));
     } else if (e.key === "End") {
       e.preventDefault();
+      fromKeyboard.current = true;
       setActive(step(options.length, -1));
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -143,14 +156,17 @@ export function Select({ value, defaultValue, onChange, children, className, id,
       const now = Date.now();
       typeahead.current = { text: (now - typeahead.current.at < 700 ? typeahead.current.text : "") + e.key.toLowerCase(), at: now };
       const hit = options.findIndex((o) => !o.disabled && o.text.toLowerCase().startsWith(typeahead.current.text));
-      if (hit >= 0) setActive(hit);
+      if (hit >= 0) {
+        fromKeyboard.current = true;
+        setActive(hit);
+      }
     }
   }
 
   let lastGroup: string | undefined;
 
   return (
-    <div ref={rootRef} className="relative w-full">
+    <div ref={rootRef} className={cn("relative w-full", open && "z-50")}>
       <button
         type="button"
         id={buttonId}
@@ -213,7 +229,7 @@ export function Select({ value, defaultValue, onChange, children, className, id,
                     o.disabled && "cursor-not-allowed text-ink-faint",
                   )}
                 >
-                  <span className="truncate">{o.label}</span>
+                  <span className="text-left leading-snug break-words">{o.label}</span>
                   {o.value === current ? (
                     <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4 text-gold-dark" fill="none">
                       <path d="M5 10.5l3 3 7-7" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
