@@ -8,6 +8,7 @@ import { MapCtaSection } from "@/components/invitation/MapCtaSection";
 import { ScheduleHighlightsSection } from "@/components/invitation/ScheduleHighlightsSection";
 import { WhenWhereSection } from "@/components/invitation/WhenWhereSection";
 import { isSectionEnabled } from "@/components/invitation/sectionVisibility";
+import { GallerySection } from "@/components/gallery/GallerySection";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select, Textarea } from "@/components/ui/Field";
 import { formatDate, formatTimeRange, isDateValue, isTimeValue } from "@/lib/date";
@@ -195,6 +196,8 @@ export function InvitePage() {
     event.config.kind === "invitation" && isSectionEnabled(sections, "details", true);
   const showWhenWhere =
     event.config.kind === "invitation" && Boolean(date || venue || address);
+  const showGallery =
+    event.config.kind === "invitation" && isSectionEnabled(sections, "gallery", false);
 
   const scheduleItems = [
     hosts ? { label: "Hosts", value: hosts } : null,
@@ -420,6 +423,19 @@ export function InvitePage() {
           <InviteShareHint eventTitle={event.title} />
         </section>
       </InviteAtmosphere>
+
+      {showGallery && (
+        <InviteAtmosphere tone="band" className="border-b border-stone-200/60">
+          <div className="mx-auto max-w-3xl px-4 py-16 md:py-20">
+            <GallerySection
+              ownerKind="invitation"
+              slug={slug}
+              eventTitle={event.title}
+              className="animate-fade-up"
+            />
+          </div>
+        </InviteAtmosphere>
+      )}
 
       <InviteBrandFooter />
     </div>

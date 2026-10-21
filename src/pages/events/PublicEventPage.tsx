@@ -4,11 +4,12 @@ import { formatDuration, formatEventDate, formatEventTime, GUEST_ROLE_LABELS, ty
 import { CalendarActions, ShareActions } from "@/components/events/ShareActions";
 import { LocationMap } from "@/components/events/LocationMap";
 import { ErrorBanner, LoadingBlock } from "@/components/events/ui";
+import { GallerySection } from "@/components/gallery/GallerySection";
 import { buttonClassName } from "@/components/ui/buttonStyles";
 import { eventWhatsAppText, publicEventUrl } from "@/lib/eventShare";
 import { openInMapsUrl } from "@/lib/maps";
 import { usePageMeta } from "@/seo/usePageMeta";
-import { errorMessage, eventsApi } from "@/services/eventManagement/client";
+import { errorMessage, eventsApi, isFunctionNotDeployed } from "@/services/eventManagement/client";
 
 export function PublicEventPage() {
   const { slug = "" } = useParams();
@@ -20,7 +21,13 @@ export function PublicEventPage() {
     void eventsApi
       .publicEvent(slug)
       .then((e) => !cancelled && setEvent(e))
-      .catch((err) => !cancelled && setError(errorMessage(err, "This event could not be loaded. Please try again.")));
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = isFunctionNotDeployed(err)
+          ? "Events are not available yet — the event service hasn't been set up. Contact the administrator."
+          : errorMessage(err, "This event could not be loaded. Please try again.");
+        setError(msg);
+      });
     return () => {
       cancelled = true;
     };
@@ -166,6 +173,16 @@ export function PublicEventPage() {
             </ul>
           </section>
         ) : null}
+
+        {event.slug && (
+          <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm" aria-labelledby="gallery-heading">
+            <GallerySection
+              ownerKind="event"
+              slug={event.slug}
+              eventTitle={event.name}
+            />
+          </section>
+        )}
 
         <p className="text-center text-xs text-ink-muted">
           {event.publicId} · Made with <Link to="/" className="underline">Invana</Link>

@@ -32,6 +32,28 @@ const invitationExtras: FieldSpec[] = [
   { key: "gifts", label: "Gifts / registry note", type: "text", group: "More details", placeholder: "Your presence is our present" },
 ];
 
+/**
+ * South-Indian / Telugu wedding extra fields — auspicious details, honorifics,
+ * qualifications, parentage, ceremony timing, and closing salutation.
+ * All optional — safe to include in any wedding template's field list.
+ */
+const southIndianWeddingExtras: FieldSpec[] = [
+  { key: "blessingText", label: "Blessing text (header)", type: "text", group: "More details", placeholder: "Sri rastu · Subhamastu · Avighnamastu" },
+  { key: "solicitationMessage", label: "Solicitation message", type: "textarea", group: "More details", maxLength: 200, placeholder: "Solicit your gracious presence and blessings on the auspicious occasion of the Marriage of our Elder daughter" },
+  { key: "brideHonorific", label: "Bride honorific / title", type: "text", group: "More details", placeholder: "Chy. Sow." },
+  { key: "groomHonorific", label: "Groom honorific / title", type: "text", group: "More details", placeholder: "Chy." },
+  { key: "brideQualification", label: "Bride qualification", type: "text", group: "More details", placeholder: "B. Tech." },
+  { key: "groomQualification", label: "Groom qualification", type: "text", group: "More details", placeholder: "M.S." },
+  { key: "brideParentage", label: "Bride's parentage line", type: "text", group: "More details", placeholder: "Elder Daughter of Sri … & Smt. …" },
+  { key: "groomParentage", label: "Groom's parentage line", type: "text", group: "More details", placeholder: "Younger Son of Sri … of …, … Mandal" },
+  { key: "ceremonyName", label: "Ceremony name", type: "text", group: "More details", placeholder: "Sumuhurtham" },
+  { key: "auspiciousTime", label: "Lagnam / auspicious time", type: "text", group: "More details", placeholder: "Midhuna Lagnam" },
+  { key: "dinnerTime", label: "Dinner time", type: "text", group: "More details", placeholder: "6 pm" },
+  { key: "dinnerNote", label: "Dinner venue note", type: "text", group: "More details", placeholder: "At Venue" },
+  { key: "mandapamName", label: "Mandapam / hall name", type: "text", group: "More details", placeholder: "Sri Sai Alekya Kalyana Mandapam A/c" },
+  { key: "complimentsFrom", label: "Compliments from", type: "text", group: "More details", placeholder: "Near & Dear" },
+];
+
 function messageField(): FieldSpec {
   return {
     key: "invitationMessage",
@@ -109,6 +131,7 @@ export function invitationFields(kind: EventTypeId): FieldSpec[] {
       { key: "groomParents", label: "Groom's parents", type: "text", group: "Details", placeholder: "Mr & Mrs Reddy" },
       message,
       ...sharedTail,
+      ...southIndianWeddingExtras,
     ];
   }
 

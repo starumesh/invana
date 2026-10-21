@@ -78,6 +78,16 @@ export function resolveFields(_template: TemplateDefinition, input: RenderInput,
     .filter(Boolean)
     .join("  ·  ");
 
+  // South-Indian wedding computed lines
+  const brideHonorific = text(fields, "brideHonorific");
+  const groomHonorific = text(fields, "groomHonorific");
+  const brideQualification = text(fields, "brideQualification");
+  const groomQualification = text(fields, "groomQualification");
+  const brideFullLine = [brideHonorific, bride].filter(Boolean).join(" ");
+  const groomFullLine = [groomHonorific, groom].filter(Boolean).join(" ");
+  const brideQualLine = brideQualification;
+  const groomQualLine = groomQualification;
+
   const brideParents = text(fields, "brideParents");
   const groomParents = text(fields, "groomParents");
   const fatherName = text(fields, "fatherName");
@@ -254,6 +264,10 @@ export function resolveFields(_template: TemplateDefinition, input: RenderInput,
     parentsLine,
     brideParents,
     groomParents,
+    brideFullLine: brideFullLine || bride,
+    groomFullLine: groomFullLine || groom,
+    brideQualLine,
+    groomQualLine,
     detailExtras,
     extraNote: text(fields, "additionalNote"),
     hashtagLine: hashtag ? `#${hashtag}` : "",
