@@ -1,12 +1,15 @@
 import { MAX_ALBUM_PHOTOS } from "@/lib/collageLayout";
 import { prepareImageForUpload } from "@/lib/imageOptimize";
-import { blobToDataUrl } from "@/lib/mediaUrl";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { callEdgeFunction } from "@/services/api/edgeClient";
+import { callEdgeFunction, EdgeApiError } from "@/services/api/edgeClient";
 import { demoAddPhoto, demoListPhotos, demoRemovePhoto } from "@/services/gallery/demoStore";
 import type { GalleryAlbum, GalleryOwnerKind, GalleryPhoto, GalleryUploadInput } from "@/services/gallery/types";
 
 const TOKEN_KEY = "invana.gallery.tokens";
+
+export class GalleryRemoteError extends Error {
+  override name = "GalleryRemoteError";
+}
 
 type RemotePhoto = {
   id: string;
@@ -61,24 +64,45 @@ function withLocalDelete(photo: RemotePhoto, canModerate: boolean): GalleryPhoto
   };
 }
 
-function remoteMode(): boolean {
-  return isSupabaseConfigured();
+function remoteMessage(err: unknown): string {
+  if (err instanceof EdgeApiError) {
+    if (err.status === 404) {
+      return "Photo album is not set up on the server. Deploy the gallery Edge Function and run migration 20261021000000_gallery.sql in Supabase.";
+    }
+    if (err.status === 429) return err.message;
+    if (err.status >= 400 && err.status < 500) return err.message;
+  }
+  if (err instanceof TypeError && /fetch/i.test(String(err.message))) {
+    return "Could not reach the photo album. Check your connection, or deploy the gallery Edge Function in Supabase.";
+  }
+  return err instanceof Error ? err.message : "Could not reach the photo album.";
+}
+
+async function callGallery<T>(opts: Parameters<typeof callEdgeFunction<T>>[0]): Promise<T> {
+  try {
+    const data = await callEdgeFunction<T>({ ...opts, auth: false });
+    if (data === null) {
+      throw new GalleryRemoteError(
+        "Photo album requires Supabase. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY, then deploy the gallery function.",
+      );
+    }
+    return data;
+  } catch (err) {
+    if (err instanceof GalleryRemoteError) throw err;
+    throw new GalleryRemoteError(remoteMessage(err));
+  }
 }
 
 export async function listGallery(ownerKind: GalleryOwnerKind, slug: string): Promise<GalleryAlbum> {
-  if (!remoteMode()) {
+  if (!isSupabaseConfigured()) {
     const photos = await demoListPhotos(ownerKind, slug, deleteTokenFor);
     return { photos, canModerate: false };
   }
-  const data = await callEdgeFunction<{ photos: RemotePhoto[]; canModerate?: boolean }>({
+
+  const data = await callGallery<{ photos: RemotePhoto[]; canModerate?: boolean }>({
     path: `gallery?ownerKind=${encodeURIComponent(ownerKind)}&slug=${encodeURIComponent(slug)}`,
     method: "GET",
-    auth: true,
   });
-  if (!data) {
-    const fallbackPhotos = await demoListPhotos(ownerKind, slug, deleteTokenFor);
-    return { photos: fallbackPhotos, canModerate: false };
-  }
   const canModerate = Boolean(data.canModerate);
   return {
     canModerate,
@@ -91,8 +115,9 @@ export async function addGalleryPhoto(input: GalleryUploadInput): Promise<Galler
   if (!contributorName) throw new Error("Add your name so the hosts know who shared the photo.");
   const file = await prepareImageForUpload(input.file);
 
-  if (!remoteMode()) {
+  if (!isSupabaseConfigured()) {
     const deleteToken = newDeleteToken();
+    const { blobToDataUrl } = await import("@/lib/mediaUrl");
     const url = await blobToDataUrl(file);
     const photo = await demoAddPhoto({
       ownerKind: input.ownerKind,
@@ -106,10 +131,9 @@ export async function addGalleryPhoto(input: GalleryUploadInput): Promise<Galler
   }
 
   const contentBase64 = await fileToBase64(file);
-  const data = await callEdgeFunction<{ photo: RemotePhoto; deleteToken: string }>({
+  const data = await callGallery<{ photo: RemotePhoto; deleteToken: string }>({
     path: "gallery",
     method: "POST",
-    auth: true,
     body: {
       ownerKind: input.ownerKind,
       slug: input.slug,
@@ -119,7 +143,7 @@ export async function addGalleryPhoto(input: GalleryUploadInput): Promise<Galler
     },
   });
   if (!data?.photo?.url || !data.deleteToken) {
-    throw new Error("Could not save that photo.");
+    throw new GalleryRemoteError("Could not save that photo to storage.");
   }
   rememberDeleteToken(data.photo.id, data.deleteToken);
   return withLocalDelete(data.photo, false);
@@ -127,15 +151,16 @@ export async function addGalleryPhoto(input: GalleryUploadInput): Promise<Galler
 
 export async function removeGalleryPhoto(ownerKind: GalleryOwnerKind, slug: string, photo: GalleryPhoto): Promise<void> {
   const deleteToken = deleteTokenFor(photo.id);
-  if (!remoteMode()) {
+
+  if (!isSupabaseConfigured()) {
     await demoRemovePhoto(photo.id, deleteToken);
     forgetDeleteToken(photo.id);
     return;
   }
-  await callEdgeFunction({
+
+  await callGallery({
     path: "gallery",
     method: "DELETE",
-    auth: true,
     body: { ownerKind, slug, id: photo.id, deleteToken },
   });
   forgetDeleteToken(photo.id);

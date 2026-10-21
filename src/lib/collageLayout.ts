@@ -1,8 +1,10 @@
 /** Pure collage geometry. Rendering lives in `collage.ts`. */
 
 export const COLLAGE_SIZE = 1600;
-export const COLLAGE_GAP = 16;
-export const COLLAGE_PAD = 28;
+export const COLLAGE_BANNER_WIDTH = 1920;
+export const COLLAGE_BANNER_HEIGHT = 1080;
+export const COLLAGE_GAP = 12;
+export const COLLAGE_PAD = 24;
 export const MAX_COLLAGE_PHOTOS = 12;
 export const MAX_ALBUM_PHOTOS = 40;
 
@@ -105,6 +107,58 @@ export function collageLayout(
       x = (inner - rowWidth) / 2 + col * (cellW + gap);
     }
     rects.push(place(pad, x, row * (cellH + gap), cellW, cellH));
+  }
+  return rects;
+}
+
+/** Wide 16:9 collage for downloads — balanced grids for common counts. */
+export function collageLayoutBanner(
+  count: number,
+  width = COLLAGE_BANNER_WIDTH,
+  height = COLLAGE_BANNER_HEIGHT,
+  gap = COLLAGE_GAP,
+  pad = COLLAGE_PAD,
+): CollageRect[] {
+  const n = Math.max(0, Math.min(Math.floor(count), MAX_COLLAGE_PHOTOS));
+  if (n === 0) return [];
+  const innerW = width - pad * 2;
+  const innerH = height - pad * 2;
+
+  if (n === 1) return [{ x: pad, y: pad, width: innerW, height: innerH }];
+
+  if (n === 2) {
+    const cellW = (innerW - gap) / 2;
+    return [
+      { x: pad, y: pad, width: cellW, height: innerH },
+      { x: pad + cellW + gap, y: pad, width: cellW, height: innerH },
+    ];
+  }
+
+  if (n === 3) {
+    const leftW = (innerW - gap) * 0.55;
+    const rightW = innerW - gap - leftW;
+    const cellH = (innerH - gap) / 2;
+    return [
+      { x: pad, y: pad, width: leftW, height: innerH },
+      { x: pad + leftW + gap, y: pad, width: rightW, height: cellH },
+      { x: pad + leftW + gap, y: pad + cellH + gap, width: rightW, height: cellH },
+    ];
+  }
+
+  const cols = n <= 4 ? 2 : n <= 6 ? 3 : 4;
+  const rows = Math.ceil(n / cols);
+  const cellW = (innerW - gap * (cols - 1)) / cols;
+  const cellH = (innerH - gap * (rows - 1)) / rows;
+  const rects: CollageRect[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    rects.push({
+      x: pad + col * (cellW + gap),
+      y: pad + row * (cellH + gap),
+      width: cellW,
+      height: cellH,
+    });
   }
   return rects;
 }

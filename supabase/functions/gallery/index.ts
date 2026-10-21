@@ -61,7 +61,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 function sanitizeSlug(raw: string): string {
-  return (raw ?? "").replace(/[^a-z0-9-]/gi, "").slice(0, 80);
+  return (raw ?? "").toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 80);
 }
 
 serve(async (req) => {

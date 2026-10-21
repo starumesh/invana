@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { CountdownSection } from "@/components/invitation/CountdownSection";
+import { GalleryLightbox } from "@/components/gallery/GalleryLightbox";
+import { GallerySection, useGalleryAlbum } from "@/components/invitation/GallerySection";
 import { InviteAtmosphere } from "@/components/invitation/InviteAtmosphere";
 import { InviteBrandFooter } from "@/components/invitation/InviteBrandFooter";
 import { InviteShareHint } from "@/components/invitation/InviteShareHint";
@@ -8,7 +10,6 @@ import { MapCtaSection } from "@/components/invitation/MapCtaSection";
 import { ScheduleHighlightsSection } from "@/components/invitation/ScheduleHighlightsSection";
 import { WhenWhereSection } from "@/components/invitation/WhenWhereSection";
 import { isSectionEnabled } from "@/components/invitation/sectionVisibility";
-import { GallerySection } from "@/components/gallery/GallerySection";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Select, Textarea } from "@/components/ui/Field";
 import { formatDate, formatTimeRange, isDateValue, isTimeValue } from "@/lib/date";
@@ -84,6 +85,17 @@ export function InvitePage() {
       type: "article" as const,
     };
   }, [event, missing]);
+
+  const galleryEnabled =
+    event?.config.kind === "invitation" && isSectionEnabled(event.config.sections, "gallery", true);
+  const gallery = useGalleryAlbum("invitation", slug, Boolean(galleryEnabled));
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  function openGallery(index = 0) {
+    setGalleryIndex(index);
+    setGalleryOpen(true);
+  }
 
   usePageMeta(inviteMeta);
   useEffect(() => {
@@ -196,8 +208,7 @@ export function InvitePage() {
     event.config.kind === "invitation" && isSectionEnabled(sections, "details", true);
   const showWhenWhere =
     event.config.kind === "invitation" && Boolean(date || venue || address);
-  const showGallery =
-    event.config.kind === "invitation" && isSectionEnabled(sections, "gallery", false);
+  const showGallery = Boolean(galleryEnabled);
 
   const scheduleItems = [
     hosts ? { label: "Hosts", value: hosts } : null,
@@ -227,15 +238,28 @@ export function InvitePage() {
         </div>
       </header>
 
-      <InviteAtmosphere tone="hero" className="border-b border-stone-200/70">
-        <main className="mx-auto grid max-w-5xl gap-10 px-4 py-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start lg:py-14">
-          <div className="animate-fade-up overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-card">
+      <InviteAtmosphere
+        tone="hero"
+        className="border-b border-stone-200/70"
+        coverSrc={showGallery ? gallery.coverUrl : null}
+        coverLoading={showGallery ? gallery.coverLoading : false}
+        onCoverClick={showGallery && gallery.photos.length > 0 ? () => openGallery(0) : undefined}
+      >
+        <main className="pointer-events-none mx-auto grid max-w-5xl gap-10 px-4 py-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start lg:py-14">
+          <div className="pointer-events-auto animate-fade-up overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-card">
             <div className="aspect-[1080/1512] bg-cream-dark">
               <Composition template={template} input={event.config} guestName={guest} />
             </div>
           </div>
 
-          <div className="animate-fade-up space-y-7 lg:pt-4" style={{ animationDelay: "80ms" }}>
+          <div
+            className={`pointer-events-auto animate-fade-up space-y-7 lg:pt-4 ${
+              showGallery && gallery.coverUrl
+                ? "rounded-2xl border border-white/50 bg-cream/80 px-5 py-6 shadow-soft backdrop-blur-md sm:px-6"
+                : ""
+            }`}
+            style={{ animationDelay: "80ms" }}
+          >
             <section>
               <p className="text-xs uppercase tracking-[0.18em] text-gold-dark">
                 {event.config.eventType?.replace(/-/g, " ") ?? "Invitation"}
@@ -294,6 +318,23 @@ export function InvitePage() {
           </div>
         </main>
       </InviteAtmosphere>
+
+      {showGallery ? (
+        <GallerySection
+          album={gallery}
+          eventTitle={event.title}
+          onPhotoClick={(index) => openGallery(index)}
+        />
+      ) : null}
+
+      {showGallery && galleryOpen && gallery.photos.length > 0 ? (
+        <GalleryLightbox
+          photos={gallery.photos}
+          initialIndex={galleryIndex}
+          eventTitle={event.title}
+          onClose={() => setGalleryOpen(false)}
+        />
+      ) : null}
 
       <InviteAtmosphere tone="band" className="border-b border-stone-200/60">
         <section
@@ -423,19 +464,6 @@ export function InvitePage() {
           <InviteShareHint eventTitle={event.title} />
         </section>
       </InviteAtmosphere>
-
-      {showGallery && (
-        <InviteAtmosphere tone="band" className="border-b border-stone-200/60">
-          <div className="mx-auto max-w-3xl px-4 py-16 md:py-20">
-            <GallerySection
-              ownerKind="invitation"
-              slug={slug}
-              eventTitle={event.title}
-              className="animate-fade-up"
-            />
-          </div>
-        </InviteAtmosphere>
-      )}
 
       <InviteBrandFooter />
     </div>

@@ -11,6 +11,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { HomePage } from "@/pages/HomePage";
 import { InvitePage } from "@/pages/InvitePage";
 import { SignInPage } from "@/pages/SignInPage";
+import { PersonalizePage } from "@/pages/PersonalizePage";
 import { TemplatesPage } from "@/pages/TemplatesPage";
 
 const named = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) =>
@@ -68,6 +69,7 @@ export function App() {
           <Route path="/create/card" element={<CreatePage />} />
           <Route path="/create/:eventType" element={<CreatePage />} />
           <Route path="/builder/:id" element={<BuilderPage />} />
+          <Route path="/personalize" element={<PersonalizePage />} />
           <Route path="/events" element={<Lazy><EventsListPage /></Lazy>} />
           <Route path="/events/create" element={<Lazy><EventWizardPage /></Lazy>} />
           <Route path="/events/:eventId/edit" element={<Lazy><EventWizardPage /></Lazy>} />

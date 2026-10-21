@@ -1,10 +1,15 @@
 import type { ReactNode } from "react";
+import { GalleryCoverLayer } from "@/components/gallery/GalleryCoverLayer";
 
 type Props = {
   children: ReactNode;
   className?: string;
   /** Deeper cream band for secondary content areas */
   tone?: "hero" | "band";
+  /** Album cover or auto collage — full-bleed behind the invitation card. */
+  coverSrc?: string | null;
+  coverLoading?: boolean;
+  onCoverClick?: () => void;
 };
 
 const PATTERN =
@@ -13,7 +18,14 @@ const PATTERN =
 /**
  * Cream / gold atmosphere layer — fills barren voids without purple AI-slop gradients.
  */
-export function InviteAtmosphere({ children, className = "", tone = "band" }: Props) {
+export function InviteAtmosphere({
+  children,
+  className = "",
+  tone = "band",
+  coverSrc,
+  coverLoading,
+  onCoverClick,
+}: Props) {
   const gradient =
     tone === "hero"
       ? "radial-gradient(ellipse 75% 55% at 12% 18%, #e8d5b8 0%, transparent 55%), radial-gradient(ellipse 60% 45% at 92% 8%, #f0e2d0 0%, transparent 50%), linear-gradient(165deg, #faf7f2 0%, #f3ebe0 52%, #ebe0d0 100%)"
@@ -21,13 +33,24 @@ export function InviteAtmosphere({ children, className = "", tone = "band" }: Pr
 
   return (
     <div className={`relative overflow-hidden ${className}`}>
-      <div className="pointer-events-none absolute inset-0" style={{ background: gradient }} aria-hidden />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{ backgroundImage: PATTERN }}
-        aria-hidden
-      />
-      <div className="relative">{children}</div>
+      {coverSrc ? (
+        <GalleryCoverLayer
+          coverSrc={coverSrc}
+          coverLoading={coverLoading}
+          onOpenGallery={onCoverClick}
+          variant="invite"
+        />
+      ) : (
+        <>
+          <div className="pointer-events-none absolute inset-0" style={{ background: gradient }} aria-hidden />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{ backgroundImage: PATTERN }}
+            aria-hidden
+          />
+        </>
+      )}
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }
