@@ -59,7 +59,11 @@ async function request<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: str
     if (err instanceof EdgeApiError) {
       const payload = (err.payload ?? {}) as Record<string, unknown>;
       if (err.status === 404 && !payload.code) {
-        throw new EmApiError("Event management service is not deployed yet. Ask the admin to deploy the event-management function.", 404, "NOT_FOUND");
+        throw new EmApiError(
+          "Event management is not set up yet. If you're the administrator, deploy the `event-management` Supabase function.",
+          404,
+          "FUNCTION_NOT_DEPLOYED",
+        );
       }
       throw toApiError(err.status, { error: err.message, ...payload });
     }
@@ -179,4 +183,9 @@ export function errorMessage(err: unknown, fallback: string): string {
   if (err instanceof EmApiError) return err.message;
   if (err instanceof Error && /fetch|network/i.test(err.message)) return NETWORK_ERROR_MESSAGE;
   return fallback;
+}
+
+/** Returns true when the error indicates the `event-management` Edge Function is not deployed. */
+export function isFunctionNotDeployed(err: unknown): boolean {
+  return err instanceof EmApiError && err.code === "FUNCTION_NOT_DEPLOYED";
 }

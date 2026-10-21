@@ -1,6 +1,427 @@
 import type { CardTypeId, EventTypeId, TemplateDefinition } from "@/types";
 import { classicInvitation, profileCard, type Palette } from "@/templates/factory";
 
+// ─── South-Indian Wedding Royal template (hand-crafted TemplateDefinition) ───
+const PLAYFAIR_SERIF = '"Playfair Display", Georgia, serif';
+const CORMORANT_SERIF = '"Cormorant Garamond", Georgia, serif';
+const GREAT_VIBES = '"Great Vibes", cursive';
+
+const southIndianWeddingRoyal: TemplateDefinition = {
+  id: "south-indian-wedding-royal",
+  name: "Royal Arch Wedding",
+  kind: "invitation",
+  eventTypes: ["wedding", "reception"],
+  category: "south-indian",
+  tags: ["wedding", "traditional", "south-indian", "royal", "arch", "floral"],
+  orientation: "portrait",
+  dimensions: { width: 1080, height: 1512, unit: "px", printWidth: 5, printHeight: 7, printUnit: "in" },
+  background: { type: "solid", colors: ["#faf6f0"] },
+  fonts: { heading: PLAYFAIR_SERIF, body: CORMORANT_SERIF, accent: GREAT_VIBES },
+  colors: {
+    paper: "#faf6f0",
+    ink: "#2d1a5e",
+    accent: "#b8956a",
+    muted: "#7a5c8e",
+    line: "#d4c4e8",
+    purple: "#5b2d8e",
+    gold: "#b8956a",
+    boxbg: "#f3ecfa",
+  },
+  fields: [],
+  previewHint: "South Indian Telugu wedding with Sanskrit blessing header, Ganesha motif, bride & groom names in decorative script, arch design, and ceremony details.",
+  license: {
+    source: "Original Invana composition",
+    license: "All rights reserved — original artwork and layout",
+    commercialUseAllowed: true,
+  },
+  elements: [
+    // ── Background & borders ──
+    { id: "bg", type: "rect", x: 0, y: 0, width: 1080, height: 1512, fill: "paper" },
+    { id: "frame-outer", type: "frame", x: 22, y: 22, width: 1036, height: 1468, stroke: "line", strokeWidth: 2 },
+    { id: "frame-inner", type: "frame", x: 34, y: 34, width: 1012, height: 1444, stroke: "accent", strokeWidth: 0.8, opacity: 0.6 },
+
+    // ── Top decorative section: floral vine + arch + corner flourishes ──
+    { id: "floral-top", type: "decor", decor: "floral-vine-top", x: 0, y: 0, width: 1080, height: 170, fill: "line" },
+    { id: "arch-top", type: "decor", decor: "arch-top", x: 190, y: 30, width: 700, height: 260, fill: "line" },
+    { id: "corner-flourish", type: "decor", decor: "corner-flourish", x: 22, y: 22, width: 160, height: 160, fill: "accent" },
+
+    // ── Ganesha motif ──
+    { id: "ganesh", type: "motif", motif: "ganesh", x: 540, y: 145, width: 80, height: 80, fill: "accent" },
+
+    // ── Sanskrit blessing header ──
+    {
+      id: "blessing",
+      type: "text",
+      field: "blessingText",
+      x: 540, y: 220,
+      width: 680,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 22,
+      fill: "muted",
+      textAnchor: "middle",
+      fontWeight: 400,
+      letterSpacing: 1.2,
+      maxLines: 3,
+      lineHeight: 1.7,
+    },
+
+    // ── "WEDDING" heading ──
+    {
+      id: "heading-wedding",
+      type: "text",
+      staticText: "WEDDING",
+      x: 540, y: 310,
+      width: 960,
+      fontFamily: PLAYFAIR_SERIF,
+      fontSize: 88,
+      fill: "purple",
+      textAnchor: "middle",
+      fontWeight: 700,
+      letterSpacing: 14,
+      textTransform: "uppercase",
+    },
+
+    // ── "Invitation" script ──
+    {
+      id: "heading-invitation",
+      type: "text",
+      staticText: "Invitation",
+      x: 540, y: 410,
+      width: 720,
+      fontFamily: GREAT_VIBES,
+      fontSize: 78,
+      fill: "purple",
+      textAnchor: "middle",
+      fontWeight: 400,
+    },
+
+    // ── Horizontal gold divider ──
+    { id: "divider-1", type: "line", x: 180, y: 462, width: 720, stroke: "accent", strokeWidth: 1.5 },
+    { id: "lotus-1", type: "motif", motif: "lotus", x: 540, y: 462, width: 60, height: 30, fill: "accent" },
+
+    // ── Host names (bride's parents, who are the hosts in South Indian weddings) ──
+    {
+      id: "host-names",
+      type: "text",
+      field: "brideParents",
+      x: 540, y: 530,
+      width: 840,
+      fontFamily: PLAYFAIR_SERIF,
+      fontSize: 28,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 700,
+      maxLines: 2,
+    },
+
+    // ── Solicitation / invitation message ──
+    {
+      id: "solicitation",
+      type: "text",
+      field: "solicitationMessage",
+      x: 540, y: 600,
+      width: 800,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 24,
+      fill: "muted",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 4,
+      lineHeight: 1.6,
+    },
+
+    // ── Bride full name (honorific + name) ──
+    {
+      id: "bride-name",
+      type: "text",
+      field: "brideFullLine",
+      x: 540, y: 760,
+      width: 880,
+      fontFamily: GREAT_VIBES,
+      fontSize: 72,
+      fill: "purple",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 1,
+    },
+
+    // ── Bride qualification ──
+    {
+      id: "bride-qual",
+      type: "text",
+      field: "brideQualLine",
+      x: 540, y: 820,
+      width: 600,
+      fontFamily: PLAYFAIR_SERIF,
+      fontSize: 22,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 500,
+      maxLines: 1,
+    },
+
+    // ── "With" ornamental line ──
+    { id: "with-line-left", type: "line", x: 220, y: 878, width: 260, stroke: "accent", strokeWidth: 1 },
+    {
+      id: "with-text",
+      type: "text",
+      staticText: "With",
+      x: 540, y: 892,
+      width: 240,
+      fontFamily: GREAT_VIBES,
+      fontSize: 48,
+      fill: "accent",
+      textAnchor: "middle",
+      fontWeight: 400,
+    },
+    { id: "with-line-right", type: "line", x: 600, y: 878, width: 260, stroke: "accent", strokeWidth: 1 },
+
+    // ── Groom full name (honorific + name) ──
+    {
+      id: "groom-name",
+      type: "text",
+      field: "groomFullLine",
+      x: 540, y: 970,
+      width: 880,
+      fontFamily: GREAT_VIBES,
+      fontSize: 72,
+      fill: "purple",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 1,
+    },
+
+    // ── Groom qualification ──
+    {
+      id: "groom-qual",
+      type: "text",
+      field: "groomQualLine",
+      x: 540, y: 1030,
+      width: 600,
+      fontFamily: PLAYFAIR_SERIF,
+      fontSize: 22,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 500,
+      maxLines: 1,
+    },
+
+    // ── Groom parentage ──
+    {
+      id: "groom-parentage",
+      type: "text",
+      field: "groomParentage",
+      x: 540, y: 1080,
+      width: 840,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 22,
+      fill: "muted",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 2,
+      lineHeight: 1.55,
+    },
+
+    // ── Divider before info boxes ──
+    { id: "divider-2", type: "line", x: 180, y: 1128, width: 720, stroke: "accent", strokeWidth: 1.5 },
+
+    // ── Info box backgrounds ──
+    { id: "box-1-bg", type: "rect", x: 52, y: 1150, width: 302, height: 178, fill: "boxbg", rx: 10 },
+    { id: "box-2-bg", type: "rect", x: 389, y: 1150, width: 302, height: 178, fill: "boxbg", rx: 10 },
+    { id: "box-3-bg", type: "rect", x: 726, y: 1150, width: 302, height: 178, fill: "boxbg", rx: 10 },
+
+    // ── Box 1: Sumuhurtham (ceremony time) ──
+    {
+      id: "box-1-title",
+      type: "text",
+      field: "ceremonyName",
+      x: 203, y: 1185,
+      width: 270,
+      fontFamily: PLAYFAIR_SERIF,
+      fontSize: 21,
+      fill: "purple",
+      textAnchor: "middle",
+      fontWeight: 700,
+      maxLines: 1,
+    },
+    {
+      id: "box-1-date",
+      type: "text",
+      field: "formattedDate",
+      x: 203, y: 1222,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 18,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 2,
+      lineHeight: 1.4,
+    },
+    {
+      id: "box-1-time",
+      type: "text",
+      field: "formattedTime",
+      x: 203, y: 1270,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 18,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 1,
+    },
+    {
+      id: "box-1-lagnam",
+      type: "text",
+      field: "auspiciousTime",
+      x: 203, y: 1298,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 17,
+      fill: "muted",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 1,
+    },
+
+    // ── Box 2: Venue ──
+    {
+      id: "box-2-title",
+      type: "text",
+      staticText: "Venue",
+      x: 540, y: 1185,
+      width: 270,
+      fontFamily: PLAYFAIR_SERIF,
+      fontSize: 21,
+      fill: "purple",
+      textAnchor: "middle",
+      fontWeight: 700,
+    },
+    {
+      id: "box-2-venue",
+      type: "text",
+      field: "venueName",
+      x: 540, y: 1222,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 17,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 3,
+      lineHeight: 1.4,
+    },
+    {
+      id: "box-2-address",
+      type: "text",
+      field: "cityLine",
+      x: 540, y: 1296,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 16,
+      fill: "muted",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 2,
+      lineHeight: 1.35,
+    },
+
+    // ── Box 3: Dinner ──
+    {
+      id: "box-3-title",
+      type: "text",
+      staticText: "Dinner",
+      x: 877, y: 1185,
+      width: 270,
+      fontFamily: PLAYFAIR_SERIF,
+      fontSize: 21,
+      fill: "purple",
+      textAnchor: "middle",
+      fontWeight: 700,
+    },
+    {
+      id: "box-3-date",
+      type: "text",
+      field: "formattedDate",
+      x: 877, y: 1222,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 18,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 2,
+      lineHeight: 1.4,
+    },
+    {
+      id: "box-3-time",
+      type: "text",
+      field: "dinnerTime",
+      x: 877, y: 1270,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 18,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 1,
+    },
+    {
+      id: "box-3-note",
+      type: "text",
+      field: "dinnerNote",
+      x: 877, y: 1298,
+      width: 270,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 17,
+      fill: "muted",
+      textAnchor: "middle",
+      fontWeight: 400,
+      maxLines: 1,
+    },
+
+    // ── Divider after boxes ──
+    { id: "divider-3", type: "line", x: 180, y: 1352, width: 720, stroke: "accent", strokeWidth: 1.5 },
+
+    // ── Lotus motif above compliments ──
+    { id: "lotus-bottom", type: "motif", motif: "lotus", x: 540, y: 1382, width: 70, height: 36, fill: "accent" },
+
+    // ── Compliments label ──
+    {
+      id: "compliments-label",
+      type: "text",
+      staticText: "With best Compliments from :",
+      x: 540, y: 1430,
+      width: 720,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 22,
+      fill: "muted",
+      textAnchor: "middle",
+      fontWeight: 400,
+      letterSpacing: 0.5,
+    },
+
+    // ── Compliments from value ──
+    {
+      id: "compliments-from",
+      type: "text",
+      field: "complimentsFrom",
+      x: 540, y: 1476,
+      width: 720,
+      fontFamily: CORMORANT_SERIF,
+      fontSize: 26,
+      fill: "ink",
+      textAnchor: "middle",
+      fontWeight: 600,
+      maxLines: 1,
+    },
+
+    // ── Bottom floral vine ──
+    { id: "floral-bottom", type: "decor", decor: "floral-vine-bottom", x: 0, y: 1470, width: 1080, height: 42, fill: "line" },
+  ],
+};
+
 const gold: Palette = { paper: "#f7f1e6", ink: "#2b2118", accent: "#b08a4a", muted: "#7a6a55", line: "#d4c4a3" };
 const ivory: Palette = { paper: "#fbf8f2", ink: "#1f1a16", accent: "#8c6d45", muted: "#6f6558", line: "#e2d5c0" };
 const blush: Palette = { paper: "#f8eee9", ink: "#3d2a2d", accent: "#c27c8a", muted: "#8a6b70", line: "#e5cfcb" };
@@ -48,6 +469,7 @@ const ALL_EVENTS: EventTypeId[] = [
 ];
 
 export const TEMPLATES: TemplateDefinition[] = [
+  southIndianWeddingRoyal,
   classicInvitation({
     id: "royal-gold",
     name: "Royal Gold",

@@ -19,6 +19,7 @@ Apply **in order** (SQL editor or `supabase db push`):
 | 6 | `migrations/20260928000000_event_management.sql` | Event Management `em_*` tables, RLS, check-in + rate-limit RPCs |
 | 7 | `migrations/20260929000000_em_pass_holder.sql` | Pass holder name/role on `em_event_passes` |
 | 8 | `migrations/20260929010000_em_list_performance.sql` | `shared_at` (Pass Shared), `em_guest_rows` view, `em_event_summaries` list RPC, list/guest indexes |
+| 9 | `migrations/20261021000000_gallery.sql` | `gallery_photos` table + RLS (public SELECT, service-role writes via `gallery` Edge Function) |
 
 Verify locally without a Supabase project (vanilla Postgres 14+ with `psql`):
 

@@ -9,7 +9,7 @@ import { buttonClassName } from "@/components/ui/buttonStyles";
 import { copyText, guestPassUrl, nativeShare, publicEventUrl } from "@/lib/eventShare";
 import { openInMapsUrl } from "@/lib/maps";
 import { downloadPassPng } from "@/lib/passImage";
-import { errorMessage, eventsApi } from "@/services/eventManagement/client";
+import { errorMessage, eventsApi, isFunctionNotDeployed } from "@/services/eventManagement/client";
 
 export function GuestPassPage() {
   const { token = "" } = useParams();
@@ -24,7 +24,13 @@ export function GuestPassPage() {
     void eventsApi
       .guestPass(token)
       .then((v) => !cancelled && setView(v))
-      .catch((err) => !cancelled && setError(errorMessage(err, "This pass could not be loaded. Please try again.")));
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = isFunctionNotDeployed(err)
+          ? "Events are not available yet — the event service hasn't been set up. Contact the administrator."
+          : errorMessage(err, "This pass could not be loaded. Please try again.");
+        setError(msg);
+      });
     return () => {
       cancelled = true;
     };

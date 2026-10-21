@@ -4,23 +4,40 @@ import { formatDuration, formatEventDate, formatEventTime, GUEST_ROLE_LABELS, ty
 import { CalendarActions, ShareActions } from "@/components/events/ShareActions";
 import { LocationMap } from "@/components/events/LocationMap";
 import { ErrorBanner, LoadingBlock } from "@/components/events/ui";
+import { GalleryCoverLayer } from "@/components/gallery/GalleryCoverLayer";
+import { GalleryLightbox } from "@/components/gallery/GalleryLightbox";
+import { GallerySection, useGalleryAlbum } from "@/components/invitation/GallerySection";
 import { buttonClassName } from "@/components/ui/buttonStyles";
 import { eventWhatsAppText, publicEventUrl } from "@/lib/eventShare";
 import { openInMapsUrl } from "@/lib/maps";
 import { usePageMeta } from "@/seo/usePageMeta";
-import { errorMessage, eventsApi } from "@/services/eventManagement/client";
+import { errorMessage, eventsApi, isFunctionNotDeployed } from "@/services/eventManagement/client";
 
 export function PublicEventPage() {
   const { slug = "" } = useParams();
   const [event, setEvent] = useState<PublicEventView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const gallery = useGalleryAlbum("event", slug, Boolean(slug));
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  function openGallery(index = 0) {
+    setGalleryIndex(index);
+    setGalleryOpen(true);
+  }
 
   useEffect(() => {
     let cancelled = false;
     void eventsApi
       .publicEvent(slug)
       .then((e) => !cancelled && setEvent(e))
-      .catch((err) => !cancelled && setError(errorMessage(err, "This event could not be loaded. Please try again.")));
+      .catch((err) => {
+        if (cancelled) return;
+        const msg = isFunctionNotDeployed(err)
+          ? "Events are not available yet — the event service hasn't been set up. Contact the administrator."
+          : errorMessage(err, "This event could not be loaded. Please try again.");
+        setError(msg);
+      });
     return () => {
       cancelled = true;
     };
@@ -50,8 +67,17 @@ export function PublicEventPage() {
 
   return (
     <main className="min-h-screen bg-cream pb-16">
-      <header className="bg-ink px-4 pb-12 pt-10 text-cream">
-        <div className="mx-auto max-w-3xl">
+      <header className="relative overflow-hidden bg-ink px-4 pb-12 pt-10 text-cream">
+        {gallery.coverUrl ? (
+          <GalleryCoverLayer
+            coverSrc={gallery.coverUrl}
+            coverLoading={gallery.coverLoading}
+            onOpenGallery={gallery.photos.length > 0 ? () => openGallery(0) : undefined}
+            variant="event"
+          />
+        ) : null}
+        <div className="pointer-events-none relative z-10 mx-auto max-w-3xl">
+          <div className="pointer-events-auto">
           <p className="text-xs uppercase tracking-[0.24em] text-gold-light">{event.eventType}</p>
           <h1 className="mt-3 font-serif text-4xl leading-tight sm:text-5xl">{event.name}</h1>
           {cancelled ? (
@@ -75,10 +101,29 @@ export function PublicEventPage() {
               <dd className="text-base font-medium">{event.venueName}</dd>
             </div>
           </dl>
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto -mt-6 max-w-3xl space-y-6 px-4">
+      {event.slug ? (
+        <GallerySection
+          album={gallery}
+          eventTitle={event.name}
+          backdropLabel="event"
+          onPhotoClick={(index) => openGallery(index)}
+        />
+      ) : null}
+
+      {galleryOpen && gallery.photos.length > 0 ? (
+        <GalleryLightbox
+          photos={gallery.photos}
+          initialIndex={galleryIndex}
+          eventTitle={event.name}
+          onClose={() => setGalleryOpen(false)}
+        />
+      ) : null}
+
+      <div className="mx-auto max-w-3xl space-y-6 px-4 pt-8">
         <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm" aria-labelledby="about">
           <h2 id="about" className="font-serif text-2xl">
             About

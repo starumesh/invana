@@ -64,7 +64,7 @@ Prefer Netlify for crawlable path URLs. The app migrates old `/#/path` links to 
 ## Connected Mode checklist (host + Supabase)
 
 1. Apply SQL migrations ([supabase/README.md](../supabase/README.md)).  
-2. Deploy Edge Functions: `invite`, `rsvp`, `media`, `events`, `og-invite` (+ `whatsapp-*` if using Cloud API).  
+2. Deploy Edge Functions: `invite`, `rsvp`, `media`, `events`, `og-invite`, `gallery` (+ `whatsapp-*` if using Cloud API).  
 3. Set frontend `VITE_*` on the host.  
 4. Set Edge secrets only in Supabase (`WHATSAPP_*`, optional `PUBLIC_SITE_URL`) — never in `VITE_*`.  
 5. Verify: sign in → upload photo → Save → Publish → open `/invite/{slug}` → RSVP from another browser → host dashboard.

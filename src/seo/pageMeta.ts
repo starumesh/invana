@@ -139,6 +139,16 @@ export function metaForPath(pathname: string): PageMeta {
     };
   }
 
+  if (path === "/personalize") {
+    return {
+      title: `Upload Invitation & Personalize | ${SITE_NAME}`,
+      description:
+        "Upload a wedding or event invitation (PNG, JPG, or PDF), select text visually, replace or remove it, preview, and download your personalized file.",
+      keywords: `${DEFAULT_KEYWORDS}, upload invitation, personalize invitation, visual editor`,
+      noIndex: true,
+    };
+  }
+
   if (path.startsWith("/builder/")) {
     return {
       title: `Invitation Builder | ${SITE_NAME}`,

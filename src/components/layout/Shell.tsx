@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuthSession } from "@/auth/AuthSession";
+import { CreateFab } from "@/components/layout/CreateFab";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { Button } from "@/components/ui/Button";
 
@@ -61,6 +62,7 @@ export function Shell() {
         </div>
       </header>
       <Outlet />
+      <CreateFab />
       <footer className="border-t border-stone-200/80 px-4 py-12 text-sm text-ink-muted">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
